@@ -1620,6 +1620,7 @@ function saveTask(){
   if(id){
     const t=db.tasks.find(x=>x.id===id);
     if(!t.log) t.log=[];
+    const oldDeviceId=t.device||null;
     const pName={yuksek:'Yüksek',orta:'Orta',dusuk:'Düşük'};
     const devName=v=>{ const d=v?db.devices.find(x=>x.id===v):null; return d?d.name:'yok'; };
     const changes=[];
@@ -1639,6 +1640,7 @@ function saveTask(){
     if(!wasSvcSet && t.svcDate) t.svcCreated=now(); // plan ilk kez burada oluşturuldu
     else if(!t.svcDate) { t.svcCreated=null; t.svcDone=false; } // plan kaldırıldı
     if(svcDateChanged || svcTimeChanged) t.svcDone=false; // yeni/yeniden planlanan servis tekrar açık sayılır
+    if(oldDeviceId!==(t.device||null)) moveTaskDeviceHistory(t, oldDeviceId, t.device||null);
     changes.forEach(c=>{
       const entry={ id:uid(), when:now(), what:c.charAt(0).toUpperCase()+c.slice(1)+'.', auto:true };
       t.log.unshift(entry);
@@ -1727,8 +1729,20 @@ function editTaskClosed(id){
 }
 
 function backfillTaskLogsToDevices(){
-  let count=0;
+  let added=0, moved=0;
   const touched=new Set();
+  // 1) Bir işin cihazı geçmişte değiştirilmiş de olsa, artık o işe ait olmayan
+  //    (yanlış/eski cihazda kalmış) kayıtları temizle.
+  db.tasks.forEach(t=>{
+    const curDeviceId=t.device||null;
+    db.devices.forEach(d=>{
+      if(!d.faults || !d.faults.length) return;
+      const before=d.faults.length;
+      d.faults=d.faults.filter(f=> !(f.fromTask===t.id && d.id!==curDeviceId));
+      if(d.faults.length!==before){ moved+=(before-d.faults.length); touched.add(d.id); }
+    });
+  });
+  // 2) Güncel cihazda eksik olan kayıtları ekle.
   db.tasks.forEach(t=>{
     if(!t.device || !t.log || !t.log.length) return;
     const dev=db.devices.find(d=>d.id===t.device); if(!dev) return;
@@ -1737,16 +1751,16 @@ function backfillTaskLogsToDevices(){
       const exists=dev.faults.some(f=>f.id===l.id && f.fromTask===t.id);
       if(!exists){
         dev.faults.push({ id:l.id, when:l.when, what:`[İş: ${t.title}] ${l.what}`, fromTask:t.id });
-        count++; touched.add(dev.id);
+        added++; touched.add(dev.id);
       }
     });
   });
   touched.forEach(id=>{
     const dev=db.devices.find(d=>d.id===id);
-    dev.faults.sort((a,b)=>b.when.localeCompare(a.when)); // kronolojik sırayı koru
+    if(dev && dev.faults) dev.faults.sort((a,b)=>b.when.localeCompare(a.when)); // kronolojik sırayı koru
   });
-  if(count){ saveDb(); renderDevices(); toast(`${count} geçmiş kayıt cihazlara aktarıldı`); }
-  else{ toast('Aktarılacak yeni kayıt bulunamadı'); }
+  if(added||moved){ saveDb(); renderDevices(); toast(`${added} kayıt eklendi, ${moved} kayıt doğru cihaza taşındı`); }
+  else{ toast('Aktarılacak/taşınacak kayıt bulunamadı'); }
 }
 function syncLogEntryToDevice(t, entry){
   if(!t.device) return;
@@ -1754,6 +1768,29 @@ function syncLogEntryToDevice(t, entry){
   if(!dev.faults) dev.faults=[];
   if(dev.faults.some(f=>f.id===entry.id && f.fromTask===t.id)) return;
   dev.faults.unshift({ id:entry.id, when:entry.when, what:`[İş: ${t.title}] ${entry.what}`, fromTask:t.id });
+}
+// Bir işin bağlı cihazı değiştirildiğinde, o işe ait tüm geçmiş (arıza) kayıtlarını
+// eski cihazdan silip yeni cihaza taşır. İşin kendi günlüğü (t.log) zaten değişmez;
+// bu sadece cihaz kartlarındaki "arıza geçmişi" aynasını (dev.faults) günceller.
+function moveTaskDeviceHistory(t, oldDeviceId, newDeviceId){
+  oldDeviceId = oldDeviceId||null; newDeviceId = newDeviceId||null;
+  if(oldDeviceId===newDeviceId) return;
+  if(oldDeviceId){
+    const oldDev=db.devices.find(d=>d.id===oldDeviceId);
+    if(oldDev && oldDev.faults) oldDev.faults=oldDev.faults.filter(f=>f.fromTask!==t.id);
+  }
+  if(newDeviceId && t.log && t.log.length){
+    const newDev=db.devices.find(d=>d.id===newDeviceId);
+    if(newDev){
+      if(!newDev.faults) newDev.faults=[];
+      t.log.forEach(l=>{
+        if(!newDev.faults.some(f=>f.id===l.id && f.fromTask===t.id)){
+          newDev.faults.push({ id:l.id, when:l.when, what:`[İş: ${t.title}] ${l.what}`, fromTask:t.id });
+        }
+      });
+      newDev.faults.sort((a,b)=>b.when.localeCompare(a.when));
+    }
+  }
 }
 function addLog(tid){
   const inp=document.getElementById('lgi-'+tid); const v=inp.value.trim(); if(!v) return;
