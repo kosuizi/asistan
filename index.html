@@ -52,6 +52,7 @@
   .io .accent{color:var(--accent); border-color:var(--accent-dim);}
   .backup-badge{font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:700; padding:7px 11px; border-radius:8px; white-space:nowrap; letter-spacing:.2px; display:inline-flex; align-items:center;}
   .backup-badge.ok{background:var(--mint-dim); color:#C8F5E6;}
+  .backup-badge.warn{background:var(--amber-bg); color:var(--amber);}
   .backup-badge.bad{background:var(--red-bg); color:var(--red);}
 
   .modeswitch{display:flex; gap:0; margin-top:14px; border:1.5px solid var(--accent-dim); border-radius:11px; overflow:hidden;}
@@ -723,29 +724,30 @@ function migrateServisRecords(){
   saveDb(true);
 }
 const FLAG_KEY = 'envanter-v1-yedekdurum';
-let backedUp = true;
+let lastBackupAt = null; // epoch ms — en son "Dışa aktar" / "İçe aktar" zamanı
 async function loadBackupFlag(){
-  try{ const snap=await initFirebaseApp().ref(FLAG_PATH).get(); if(snap.exists()) backedUp = !!(snap.val()||{}).backedUp; }
+  try{ const snap=await initFirebaseApp().ref(FLAG_PATH).get(); if(snap.exists()) lastBackupAt = (snap.val()||{}).lastBackupAt || null; }
   catch(e){}
   renderBackupBadge();
 }
 async function saveBackupFlag(){
-  try{ await initFirebaseApp().ref(FLAG_PATH).set({backedUp}); }catch(e){}
-}
-function markDirty(){
-  backedUp=false; renderBackupBadge(); saveBackupFlag();
+  try{ await initFirebaseApp().ref(FLAG_PATH).set({lastBackupAt}); }catch(e){}
 }
 function markBackedUp(){
-  backedUp=true; renderBackupBadge(); saveBackupFlag();
+  lastBackupAt = Date.now(); renderBackupBadge(); saveBackupFlag();
 }
 function renderBackupBadge(){
   const el=document.getElementById('backupBadge'); if(!el) return;
-  el.textContent = backedUp ? '● Yedeklendi' : '● Yedeklenmedi';
-  el.classList.toggle('ok', backedUp);
-  el.classList.toggle('bad', !backedUp);
+  el.classList.remove('ok','warn','bad');
+  if(!lastBackupAt){ el.textContent='● Yedeklenmedi'; el.classList.add('bad'); return; }
+  const gunFark=(Date.now()-lastBackupAt)/86400000;
+  const t=new Date(lastBackupAt); const p=n=>String(n).padStart(2,'0');
+  const tarihStr=`${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
+  el.textContent = `● Yedeklendi · ${tarihStr}`;
+  el.classList.add(gunFark>7 ? 'bad' : gunFark>1 ? 'warn' : 'ok');
 }
+setInterval(renderBackupBadge, 30*60*1000); // süre ilerledikçe renk/metin kendiliğinden tazelensin
 async function saveDb(skipDirty){
-  if(!skipDirty) markDirty();
   try{ await initFirebaseApp().ref(DB_PATH).set(JSON.parse(JSON.stringify(db))); }
   catch(e){ if(!storageWarned){storageWarned=true; toast('Kayıt hatası — sık sık Dışa aktar yap');} }
 }
