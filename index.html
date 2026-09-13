@@ -1,0 +1,2673 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asistan — Cihaz & İş Takibi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesque:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1613; --surface:#152420; --surface2:#1B2E28; --line:#264038;
+    --ink:#E8F0EC; --muted:#8FA89E; --dim:#5E756B;
+    --mint:#4FD1A5; --mint-dim:#2A7360; --amber:#E0A458; --amber-bg:#2E2416;
+    --red:#E07A5F; --red-bg:#2E1A16; --blue:#6BA9D9;
+    --r:12px;
+    --accent:#4FD1A5; --accent-dim:#2A7360; --accent-soft:#C8F5E6;
+  }
+  body.kisisel{
+    --bg:#0E1319; --surface:#141F2A; --surface2:#1A2836; --line:#26384A;
+    --ink:#E6EEF6; --muted:#8FA2B8; --dim:#5E6F82;
+    --accent:#57B0E8; --accent-dim:#2A5A80; --accent-soft:#CDE8FB;
+  }
+  body.plan{
+    --bg:#161408; --surface:#221E0F; --surface2:#2C2714; --line:#443D22;
+    --ink:#F0ECDD; --muted:#B0A582; --dim:#7A7150;
+    --accent:#E0B84E; --accent-dim:#7A6320; --accent-soft:#F5E6B0;
+  }
+  body.tarihce{
+    --bg:#1A0E0D; --surface:#251413; --surface2:#301917; --line:#4A2624;
+    --ink:#F5E6E4; --muted:#BF8F8A; --dim:#8A625E;
+    --accent:#E2664D; --accent-dim:#7A2F1F; --accent-soft:#F7C9BC;
+  }
+  body.izlem{
+    --bg:#120E1A; --surface:#1C1730; --surface2:#241D3D; --line:#362B54;
+    --ink:#EDE9F7; --muted:#A79BC7; --dim:#6F638F;
+    --accent:#9B8CFF; --accent-dim:#4B3F80; --accent-soft:#D9D2FF;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{-webkit-text-size-adjust:100%;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; font-size:14.5px; line-height:1.5; padding-bottom:80px;}
+  .wrap{max-width:760px; margin:0 auto; padding:0 14px;}
+  h1,h2,h3{font-family:'Space Grotesque',sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  header{padding:18px 0 8px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+  .logo{display:flex; align-items:baseline; gap:9px;}
+  .logo h1{font-size:21px; font-weight:700; letter-spacing:.5px; color:var(--accent);}
+  .logo span{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--dim);}
+  .io{display:flex; gap:6px; flex-wrap:wrap;}
+  .io button{font-size:11.5px; font-weight:600; border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:8px; padding:7px 11px; cursor:pointer; font-family:'Inter',sans-serif;}
+  .io button:active{transform:scale(.97);}
+  .io .accent{color:var(--accent); border-color:var(--accent-dim);}
+  .backup-badge{font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:700; padding:7px 11px; border-radius:8px; white-space:nowrap; letter-spacing:.2px; display:inline-flex; align-items:center;}
+  .backup-badge.ok{background:var(--mint-dim); color:#C8F5E6;}
+  .backup-badge.bad{background:var(--red-bg); color:var(--red);}
+
+  .modeswitch{display:flex; gap:0; margin-top:14px; border:1.5px solid var(--accent-dim); border-radius:11px; overflow:hidden;}
+  .modeswitch button{flex:1; font-family:'Space Grotesque',sans-serif; font-weight:700; font-size:14px; border:none; background:var(--surface); color:var(--muted); padding:11px; cursor:pointer; letter-spacing:.3px;}
+  .modeswitch button.on{background:var(--accent); color:var(--bg);}
+  .day-head{padding:6px 2px 14px;}
+  .day-date{font-family:'Space Grotesque',sans-serif; font-weight:700; font-size:20px; color:var(--accent);}
+  .day-sub{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .dayrow{display:flex; gap:12px; align-items:flex-start; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:13px 14px; margin-bottom:9px;}
+  .dayrow.top{border-color:var(--accent-dim); box-shadow:0 0 0 1.5px var(--accent-dim); background:var(--surface2);}
+  .dayrow-num{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; color:var(--accent); flex:0 0 auto; width:24px; text-align:center; padding-top:1px;}
+  .dayrow.top .dayrow-num{color:var(--accent);}
+  .dayrow-body{flex:1;}
+  .dayrow-title{font-weight:600; font-size:15px; line-height:1.35;}
+  .dayrow.top .dayrow-title{font-size:16px;}
+  .dayrow-meta{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;}
+  .tag-mini{font-family:'IBM Plex Mono',monospace; font-size:10px; padding:2px 7px; border-radius:5px;}
+  .tag-mini.b{background:var(--mint-dim); color:#C8F5E6;}
+  .tag-mini.k{background:#2A5A80; color:#CDE8FB;}
+  .tag-mini.d{background:var(--surface2); color:var(--muted);}
+  .planfilter{display:flex; gap:8px; margin:2px 0 14px;}
+  .planfilter button{flex:1; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:9px; padding:9px; cursor:pointer;}
+  .planfilter button.on{background:var(--accent); color:var(--bg); border-color:var(--accent);}
+
+  .tabs{display:flex; gap:4px; margin:14px 0 4px; background:var(--surface); padding:4px; border-radius:11px; border:1px solid var(--line);}
+  .tabs button{flex:1; font-family:'Space Grotesque',sans-serif; font-weight:600; font-size:13.5px; border:none; background:none; color:var(--muted); padding:9px; border-radius:8px; cursor:pointer;}
+  .tabs button.on{background:var(--surface2); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line);}
+
+  .bar{display:flex; gap:8px; align-items:center; margin:14px 0; flex-wrap:wrap;}
+  .bar input[type=text]{flex:1; min-width:140px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:9px; padding:9px 12px; font-size:14px; font-family:'Inter',sans-serif;}
+  .bar select{border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:9px; padding:9px 10px; font-size:13px; font-family:'Inter',sans-serif;}
+  .addbtn{border:none; background:var(--accent); color:#08140F; font-weight:700; border-radius:9px; padding:9px 15px; cursor:pointer; font-size:13.5px; white-space:nowrap;}
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:13px 14px; margin-bottom:10px;}
+  .dev-head{display:flex; align-items:flex-start; gap:10px;}
+  .dev-title{flex:1;}
+  .dev-title .name{font-weight:600; font-size:15.5px; font-family:'Space Grotesque',sans-serif;}
+  .dev-title .sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .dev-nums{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--dim); margin-top:5px;}
+
+  .status{font-size:11px; font-weight:600; padding:4px 9px; border-radius:999px; white-space:nowrap; font-family:'IBM Plex Mono',monospace;}
+  .s-faal{background:var(--mint-dim); color:#C8F5E6;}
+  .s-kisitli{background:var(--amber-bg); color:var(--amber);}
+  .s-dagilik{background:var(--red-bg); color:var(--red);}
+
+  .contract{margin-top:10px; font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:7px; flex-wrap:wrap;}
+  .contract .warn{color:var(--amber); font-weight:600;}
+  .contract .expired{color:var(--red); font-weight:600;}
+  .contract-badge{font-size:16px; line-height:1; flex:0 0 auto; cursor:default;}
+  .contract-badge.cb-none{opacity:.55;}
+  .contract-days{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:700; white-space:nowrap; cursor:default;}
+  .contract-days.cd-green{color:var(--mint);}
+  .contract-days.cd-amber{color:var(--amber);}
+  .contract-days.cd-red{color:var(--red);}
+
+  .expand{margin-top:11px; border-top:1px solid var(--line); padding-top:11px; display:none;}
+  .expand.open{display:block;}
+  .fault{font-size:13px; padding:7px 0; border-bottom:1px dashed var(--line); display:flex; gap:8px;}
+  .fault:last-child{border-bottom:none;}
+  .fault .when{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--dim); flex:0 0 auto; width:96px; cursor:pointer;}
+  .fault .when:hover{color:var(--accent); text-decoration:underline;}
+  .t-meta .when-edit{cursor:pointer;}
+  .t-meta .when-edit:hover{color:var(--accent); text-decoration:underline;}
+  .fault .what{flex:1;}
+  .fault .x{color:var(--dim); cursor:pointer; border:none; background:none; font-size:14px;}
+  .sectlabel{font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); margin:2px 0 7px;}
+  .addfault{display:flex; gap:6px; margin-top:8px;}
+  .addfault input{flex:1; border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:7px; padding:7px 9px; font-size:13px; font-family:'Inter',sans-serif;}
+  .addfault button{border:none; background:var(--surface2); color:var(--accent); border-radius:7px; padding:0 12px; font-weight:700; cursor:pointer;}
+
+  .rowbtns{display:flex; gap:6px; margin-top:11px; flex-wrap:wrap;}
+  .rowbtns button{font-size:11.5px; font-weight:600; border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:7px; padding:6px 10px; cursor:pointer;}
+  .rowbtns .danger{color:var(--red);}
+
+  /* task */
+  .task .t-name{font-weight:600; font-size:14.5px;}
+  .daypick{display:flex; gap:6px; flex-wrap:wrap;}
+  .subrow{display:flex; align-items:center; gap:9px; padding:6px 0; border-bottom:1px dashed var(--line);}
+  .subrow:last-of-type{border-bottom:none;}
+  .subrow input[type=checkbox]{width:17px; height:17px; accent-color:var(--accent); flex:0 0 auto; margin:0;}
+  .subrow .txt{flex:1; font-size:13.5px; line-height:1.35;}
+  .subrow .txt.done{color:var(--dim); text-decoration:line-through;}
+  .subrow .edit{border:none; background:none; color:var(--muted); font-size:11px; cursor:pointer; padding:2px 6px; flex:0 0 auto;}
+  .subrow .del{border:none; background:none; color:var(--dim); font-size:15px; cursor:pointer; padding:0 4px; flex:0 0 auto;}
+  .subrow .drag-handle{cursor:grab; color:var(--dim); font-size:15px; line-height:1; flex:0 0 auto; padding:0 2px; touch-action:none; -webkit-user-select:none; user-select:none; font-family:'IBM Plex Mono',monospace;}
+  .subrow .drag-handle:active{cursor:grabbing; color:var(--muted);}
+  .subrow.dragging{background:var(--surface2); border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,.4); border-bottom-color:transparent;}
+  .daypick label{display:flex; align-items:center; gap:4px; font-size:12.5px; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:7px; padding:6px 9px; cursor:pointer;}
+  .daypick input{accent-color:var(--accent);}
+  .task .t-name.done{color:var(--dim); text-decoration:line-through;}
+  .task .t-meta{font-size:11.5px; color:var(--dim); font-family:'IBM Plex Mono',monospace; margin-top:4px;}
+  .task .t-link{font-size:11.5px; color:var(--blue); margin-top:4px; cursor:pointer; width:fit-content;}
+  .task .t-link:hover{text-decoration:underline;}
+  .prio{font-size:10px; font-weight:700; padding:3px 7px; border-radius:5px; font-family:'IBM Plex Mono',monospace;}
+  .p-yuksek{background:var(--red-bg); color:var(--red);}
+  .p-orta{background:var(--amber-bg); color:var(--amber);}
+  .p-dusuk{background:var(--surface2); color:var(--muted);}
+
+  .empty{color:var(--dim); font-size:13px; text-align:center; padding:26px 10px;}
+
+  /* report */
+  .rep{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:16px; margin-bottom:12px;}
+  .rep h3{font-size:15px; color:var(--accent); margin-bottom:12px;}
+  .stat{display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px;}
+  .stat:last-child{border-bottom:none;}
+  .stat b{font-family:'IBM Plex Mono',monospace; color:var(--ink);}
+
+  /* modal */
+  .modal{position:fixed; inset:0; background:rgba(4,10,8,.72); z-index:50; display:none; align-items:flex-end; justify-content:center;}
+  .modal.open{display:flex;}
+  .sheet{background:var(--surface); width:100%; max-width:560px; max-height:92vh; overflow-y:auto; border-radius:16px 16px 0 0; border:1px solid var(--line); padding:18px 16px 26px;}
+  @media(min-width:600px){ .modal{align-items:center;} .sheet{border-radius:16px;} }
+  .sheet h3{font-size:17px; margin-bottom:14px; color:var(--ink);}
+  .fld{margin-bottom:11px;}
+  .fld label{display:block; font-size:11.5px; color:var(--muted); margin-bottom:4px; font-family:'IBM Plex Mono',monospace; letter-spacing:.5px;}
+  .fld input, .fld select, .fld textarea{width:100%; border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:8px; padding:10px 11px; font-size:14px; font-family:'Inter',sans-serif;}
+  .fld textarea{resize:vertical; min-height:54px;}
+  .fld.two{display:flex; gap:9px;} .fld.two > div{flex:1;}
+  .combo{position:relative;}
+  .combo input{padding-right:28px!important;}
+  .combo::after{content:'▾'; position:absolute; right:11px; top:50%; transform:translateY(-50%); color:var(--dim); font-size:11px; pointer-events:none;}
+  .combo-list{display:none; position:absolute; left:0; right:0; top:calc(100% + 3px); background:var(--surface2); border:1px solid var(--line); border-radius:9px; max-height:170px; overflow-y:auto; z-index:60; box-shadow:0 6px 18px rgba(0,0,0,.35);}
+  .combo-list.open{display:block;}
+  .combo-item{padding:9px 11px; font-size:13.5px; cursor:pointer; border-bottom:1px dashed var(--line);}
+  .combo-item:last-child{border-bottom:none;}
+  .combo-item:active{background:var(--bg);}
+  @media(hover:hover){ .combo-item:hover{background:var(--bg);} }
+  .sheet-btns{display:flex; gap:8px; margin-top:16px;}
+  .sheet-btns button{flex:1; border:none; border-radius:9px; padding:12px; font-weight:700; font-size:14px; cursor:pointer; font-family:'Inter',sans-serif;}
+  .save{background:var(--accent); color:#08140F;} .cancel{background:var(--surface2); color:var(--muted);}
+
+  .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:var(--surface2); border:1px solid var(--line); color:var(--ink); font-size:13px; padding:10px 18px; border-radius:999px; z-index:70; opacity:0; transition:opacity .25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+  input[type=file]{display:none;}
+
+  /* izlem panel */
+  .izlem-legend{font-size:11.5px; color:var(--muted); line-height:1.7; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:14px;}
+  .izlem-legend b{color:var(--ink);}
+  .izlem-grid{display:grid; grid-template-columns:repeat(2,1fr); grid-auto-rows:56px; grid-auto-flow:dense; gap:9px;}
+  .izlem-card{border-radius:13px; padding:10px 11px; display:flex; flex-direction:column; justify-content:space-between; position:relative; overflow:hidden; border:1.5px solid var(--line); background:var(--surface); cursor:pointer;}
+  .izlem-card.iz-s{grid-column:span 1; grid-row:span 1;}
+  .izlem-card.iz-m{grid-column:span 1; grid-row:span 2;}
+  .izlem-card.iz-l{grid-column:span 2; grid-row:span 2;}
+  .izlem-card.iz-xl{grid-column:span 2; grid-row:span 3;}
+  .izlem-card.iz-u-over{background:var(--red-bg); border-color:var(--red);}
+  .izlem-card.iz-u-today{background:var(--red-bg); border-color:var(--red);}
+  .izlem-card.iz-u-soon{background:var(--amber-bg); border-color:var(--amber);}
+  .izlem-card.iz-u-later{background:var(--surface2); border-color:var(--line);}
+  .izlem-card.iz-u-none{background:var(--surface); border-color:var(--line); opacity:.8;}
+  .izlem-top{display:flex; align-items:flex-start; justify-content:space-between; gap:6px;}
+  .izlem-type{font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:700; padding:2px 6px; border-radius:5px; flex:0 0 auto;}
+  .izlem-type.b{background:var(--mint-dim); color:#C8F5E6;}
+  .izlem-type.k{background:#2A5A80; color:#CDE8FB;}
+  .izlem-dot{width:9px; height:9px; border-radius:50%; flex:0 0 auto; margin-top:2px;}
+  .izlem-title{font-family:'Space Grotesque',sans-serif; font-weight:600; line-height:1.25; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical;}
+  .iz-s .izlem-title{font-size:11.5px; -webkit-line-clamp:2;}
+  .iz-m .izlem-title{font-size:13px; -webkit-line-clamp:3;}
+  .iz-l .izlem-title{font-size:15px; -webkit-line-clamp:3;}
+  .iz-xl .izlem-title{font-size:17px; -webkit-line-clamp:4;}
+  .izlem-bottom{font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--muted); display:flex; flex-wrap:wrap; gap:5px; align-items:center;}
+  .iz-u-over .izlem-bottom, .iz-u-today .izlem-bottom{color:var(--red); font-weight:700;}
+  .iz-u-soon .izlem-bottom{color:var(--amber); font-weight:600;}
+  .izlem-parent{font-size:9.5px; color:var(--dim); font-style:italic;}
+
+  /* bakım takvimi */
+  .cal-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .cal-nav button{border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:8px; padding:7px 13px; font-weight:700; font-size:15px; cursor:pointer;}
+  .cal-title{font-family:'Space Grotesque',sans-serif; font-weight:700; font-size:16px; color:var(--accent);}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+  .cal-head{font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--dim); text-align:center; padding:2px 0 6px;}
+  .cal-day{min-height:50px; border:1px solid var(--line); border-radius:8px; background:var(--surface); padding:5px 5px 4px; cursor:pointer;}
+  .cal-day.other{opacity:.32; cursor:default;}
+  .cal-day.today{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .cal-day.sel{background:var(--surface2); border-color:var(--accent);}
+  .cal-daynum{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:12px;}
+  .cal-dot-wrap{display:flex; gap:2px; flex-wrap:wrap; margin-top:5px;}
+  .cal-dot{width:6px; height:6px; border-radius:50%; background:var(--accent);}
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important;} }
+
+  /* giriş ekranı */
+  #loginScreen{position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px; z-index:999;}
+  #loginScreen.hidden{display:none;}
+  .login-card{width:100%; max-width:340px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:28px 24px;}
+  .login-card h1{font-size:20px; font-weight:700; color:var(--accent); letter-spacing:.5px;}
+  .login-card .sub{font-size:12.5px; color:var(--muted); margin-top:4px;}
+  .login-card label{display:block; font-size:12px; color:var(--muted); margin:16px 0 5px;}
+  .login-card input{width:100%; border:1px solid var(--line); background:var(--surface2); color:var(--ink); border-radius:9px; padding:10px 12px; font-size:14px; font-family:'Inter',sans-serif;}
+  .login-card button{width:100%; margin-top:20px; border:none; background:var(--accent); color:#08140F; font-weight:700; border-radius:9px; padding:11px; cursor:pointer; font-size:14px; font-family:'Space Grotesque',sans-serif;}
+  .login-card button:disabled{opacity:.6; cursor:default;}
+  .login-err{font-size:12.5px; color:var(--red); margin-top:12px; min-height:1em;}
+  #appRoot.hidden{display:none;}
+</style>
+</head>
+<body>
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>ASİSTAN</h1>
+    <div class="sub">Devam etmek için giriş yap</div>
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <label for="loginEmail">E-posta</label>
+      <input type="email" id="loginEmail" autocomplete="username" required>
+      <label for="loginPass">Şifre</label>
+      <input type="password" id="loginPass" autocomplete="current-password" required>
+      <button type="submit" id="loginBtn">Giriş yap</button>
+      <div class="login-err" id="loginErr"></div>
+    </form>
+  </div>
+</div>
+<div class="wrap hidden" id="appRoot">
+  <header>
+    <div class="logo"><h1>ASİSTAN</h1></div>
+    <div class="io">
+      <span class="backup-badge ok" id="backupBadge">● Yedeklendi</span>
+      <button class="accent" onclick="openIzlem()">İzlem</button>
+      <button class="accent" onclick="openPlan()">Plan</button>
+      <button class="accent" id="btnFaaliyetRapor" onclick="openFaaliyetRaporu()">Faaliyet Raporu</button>
+      <button class="accent" onclick="exportAssistant()">Asistan dosyası</button>
+      <button onclick="exportBackup()">Dışa aktar</button>
+      <button onclick="document.getElementById('imp').click()">İçe aktar</button>
+      <input type="file" id="imp" accept=".json" onchange="importBackup(event)">
+      <button onclick="handleLogout()" title="Çıkış yap">Çıkış</button>
+    </div>
+  </header>
+
+  <div class="modeswitch">
+    <button id="mode-biyomedikal" class="on" onclick="setMode('biyomedikal')">Biyomedikal</button>
+    <button id="mode-kisisel" onclick="setMode('kisisel')">Kişisel</button>
+  </div>
+
+  <div class="tabs">
+    <button id="tab-dev" class="on" onclick="switchTab('dev')">Cihazlar</button>
+    <button id="tab-bakim" onclick="switchTab('bakim')">Faaliyet</button>
+    <button id="tab-liste" onclick="switchTab('liste')" style="display:none">Liste</button>
+    <button id="tab-task" onclick="switchTab('task')">İşler</button>
+    <button id="tab-rep" onclick="switchTab('rep')">Rapor</button>
+    <button id="tab-hist" onclick="switchTab('hist')">Tarihçe</button>
+  </div>
+
+  <!-- DEVICES -->
+  <div id="view-dev">
+    <div class="bar">
+      <input type="text" id="devSearch" placeholder="Cihaz ara — marka, model, seri no…" oninput="renderDevices()">
+      <select id="devFilter" onchange="renderDevices()">
+        <option value="">Tüm durumlar</option>
+        <option value="faal">Faal</option>
+        <option value="kisitli">Kısıtlı</option>
+        <option value="dagilik">Kullanım dışı</option>
+      </select>
+      <button class="addbtn" onclick="openDeviceModal()">+ Cihaz</button>
+    </div>
+    <div style="text-align:right;margin:-8px 0 12px">
+      <button onclick="backfillTaskLogsToDevices()" style="border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif">Geçmiş iş günlüklerini (otomatik notlar dahil) cihazlara aktar</button>
+    </div>
+    <div id="devList"></div>
+  </div>
+
+  <!-- TASKS -->
+  <div id="view-task" style="display:none">
+    <div class="bar">
+      <input type="text" id="taskSearch" placeholder="İş ara…" oninput="renderTasks()">
+      <select id="taskFilter" onchange="renderTasks()">
+        <option value="acik">Açık işler</option>
+        <option value="bitti">Tamamlananlar</option>
+        <option value="">Tümü</option>
+      </select>
+      <button class="addbtn" onclick="openTaskModal()">+ İş</button>
+    </div>
+    <div id="taskList"></div>
+  </div>
+
+  <!-- MAINTENANCE -->
+  <div id="view-bakim" style="display:none"></div>
+
+  <!-- SHOPPING LIST -->
+  <div id="view-liste" style="display:none"></div>
+
+  <!-- REPORT -->
+  <div id="view-rep" style="display:none"></div>
+
+  <!-- HISTORY -->
+  <div id="view-hist" style="display:none">
+    <div class="bar">
+      <input type="text" id="histSearch" placeholder="Tarihçede ara…" oninput="renderHistory()">
+      <div class="combo" style="flex:0 0 190px"><input type="text" id="histDeviceFilter_q" autocomplete="off" placeholder="cihaz ara / filtrele…"><div class="combo-list" id="cl_histDeviceFilter"></div></div>
+      <input type="hidden" id="histDeviceFilter">
+    </div>
+    <div id="histList"></div>
+  </div>
+
+  <!-- DAY -->
+  <div id="view-day" style="display:none"></div>
+
+  <!-- İZLEM -->
+  <div id="view-izlem" style="display:none"></div>
+</div>
+
+<!-- Device modal -->
+<div class="modal" id="devModal">
+  <div class="sheet">
+    <h3 id="devModalTitle">Yeni cihaz</h3>
+    <input type="hidden" id="devId">
+    <div class="fld"><label>Cihaz adı / tür</label><div class="combo"><input type="text" id="f_name" autocomplete="off" placeholder="ör. Hasta Başı Monitörü"><div class="combo-list" id="cl_f_name"></div></div></div>
+    <div class="fld two">
+      <div><label>Marka</label><div class="combo"><input type="text" id="f_brand" autocomplete="off" placeholder="yazın veya seçin"><div class="combo-list" id="cl_f_brand"></div></div></div>
+      <div><label>Model</label><div class="combo"><input type="text" id="f_model" autocomplete="off" placeholder="yazın veya seçin"><div class="combo-list" id="cl_f_model"></div></div></div>
+    </div>
+    <div class="fld two">
+      <div><label>Seri no</label><input type="text" id="f_serial"></div>
+      <div><label>Demirbaş no</label><input type="text" id="f_asset"></div>
+    </div>
+    <div class="fld"><label>Sistem No</label><input type="text" id="f_sysno"></div>
+    <div class="fld two">
+      <div><label>Anabilim Dalı</label><div class="combo"><input type="text" id="f_dept" autocomplete="off" placeholder="ör. Kardiyoloji"><div class="combo-list" id="cl_f_dept"></div></div></div>
+      <div><label>Birim</label><div class="combo"><input type="text" id="f_unit" autocomplete="off" placeholder="ör. Anjiyo Ünitesi"><div class="combo-list" id="cl_f_unit"></div></div></div>
+    </div>
+    <div class="fld"><label>Konum</label><div class="combo"><input type="text" id="f_loc" autocomplete="off" placeholder="ör. 2. kat, Oda 214"><div class="combo-list" id="cl_f_loc"></div></div></div>
+    <div class="fld"><label>Durum</label>
+      <select id="f_status">
+        <option value="faal">Faal</option>
+        <option value="kisitli">Kısıtlı kullanım</option>
+        <option value="dagilik">Kullanım dışı</option>
+      </select>
+    </div>
+    <div class="sectlabel">Bakım anlaşması</div>
+    <div class="fld"><label>Anlaşma durumu</label>
+      <select id="f_contract" onchange="toggleContractFields()">
+        <option value="yok">Yok</option>
+        <option value="var">Var</option>
+      </select>
+    </div>
+    <div id="contractFields" style="display:none">
+      <div class="fld"><label>Kapsam türü</label>
+        <select id="f_coverage">
+          <option value="">— belirtilmedi —</option>
+          <option value="parcali">Parçalı</option>
+          <option value="parcasiz">Parçasız</option>
+        </select>
+      </div>
+      <div class="fld"><label>Kapsam detayı (hangi parçalar dahil/hariç vb.)</label><textarea id="f_scope" placeholder="ör. Problar ve pompa dahil, ekran hariç"></textarea></div>
+      <div class="fld two">
+        <div><label>Başlangıç</label><input type="date" id="f_cstart"></div>
+        <div><label>Bitiş</label><input type="date" id="f_cend"></div>
+      </div>
+    </div>
+    <div class="fld"><label>Şartname / not</label><textarea id="f_note"></textarea></div>
+    <div class="sheet-btns">
+      <button class="cancel" onclick="closeModal('devModal')">Vazgeç</button>
+      <button class="save" onclick="saveDevice()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task modal -->
+<div class="modal" id="taskModal">
+  <div class="sheet">
+    <h3>Yeni iş</h3>
+    <input type="hidden" id="tk_id">
+    <div class="fld"><label>İş</label><input type="text" id="tk_title" placeholder="ör. Monitör kalibrasyonu"></div>
+    <div class="fld two">
+      <div style="display:none"><label>Tür</label><select id="tk_type" onchange="toggleDeviceField()"><option value="biyomedikal">Biyomedikal</option><option value="kisisel">Kişisel</option></select></div>
+      <div><label>Öncelik</label><select id="tk_prio"><option value="orta">Orta</option><option value="yuksek">Yüksek</option><option value="dusuk">Düşük</option></select></div>
+    </div>
+    <div class="fld" id="tk_deviceWrap"><label>Bağlı cihaz (opsiyonel)</label>
+      <div class="combo"><input type="text" id="tk_device_q" autocomplete="off" placeholder="cihaz ara veya seç…"><div class="combo-list" id="cl_tk_device"></div></div>
+      <input type="hidden" id="tk_device">
+    </div>
+    <div id="tk_svcWrap" style="display:none">
+      <div class="fld"><label>Servis tarihi (opsiyonel — Faaliyet takviminde görünür)</label><input type="date" id="tk_svcdate"></div>
+      <div class="fld two">
+        <div><label>Başlangıç saati</label><input type="time" id="tk_svcstart"></div>
+        <div><label>Bitiş saati</label><input type="time" id="tk_svcend"></div>
+      </div>
+    </div>
+    <div class="fld" id="tk_notifyWrap" style="display:none"><label>Bildirim tarihi (opsiyonel — iş size ne zaman bildirildi)</label><input type="date" id="tk_notify"></div>
+    <div class="fld"><label>Süre — ne kadar sürer?</label>
+      <select id="tk_duration">
+        <option value="dakika">Dakikalar (birkaç dakikada biter)</option>
+        <option value="oturum">Tek oturum (saatler, aynı oturuşta biter)</option>
+        <option value="gunler">Günler sürer</option>
+        <option value="hafta">Haftalar+ sürer</option>
+      </select>
+    </div>
+    <div class="fld"><label>Tekrar</label>
+      <select id="tk_repeat" onchange="toggleRepeatFields()">
+        <option value="tek">Tek seferlik</option>
+        <option value="haftalik">Haftalık — belirli gün</option>
+        <option value="aylik">Aylık — belirli tarih</option>
+        <option value="sonra">Tamamladıktan X gün sonra</option>
+      </select>
+    </div>
+    <div class="fld" id="rp_weekly" style="display:none"><label>Haftanın günleri (birden çok seçilebilir)</label>
+      <div id="tk_weekdays" class="daypick">
+        <label><input type="checkbox" value="1">Pzt</label>
+        <label><input type="checkbox" value="2">Sal</label>
+        <label><input type="checkbox" value="3">Çar</label>
+        <label><input type="checkbox" value="4">Per</label>
+        <label><input type="checkbox" value="5">Cum</label>
+        <label><input type="checkbox" value="6">Cmt</label>
+        <label><input type="checkbox" value="0">Paz</label>
+      </div>
+    </div>
+    <div class="fld" id="rp_monthly" style="display:none"><label>Ayın günleri (virgülle ayır: 7, 15, 28)</label><input type="text" id="tk_monthdays" placeholder="ör. 1, 15"></div>
+    <div class="fld" id="rp_after" style="display:none"><label>Kaç gün sonra</label><input type="number" id="tk_afterdays" min="1" value="7"></div>
+    <div class="fld"><label>Son tarih (opsiyonel)</label><input type="date" id="tk_due"></div>
+    <div class="fld"><label>Not</label><textarea id="tk_note"></textarea></div>
+    <div class="sheet-btns">
+      <button class="cancel" onclick="closeModal('taskModal')">Vazgeç</button>
+      <button class="save" onclick="saveTask()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Maintenance modal -->
+<div class="modal" id="bakimModal">
+  <div class="sheet">
+    <h3 id="bakimModalTitle">Yeni bakım</h3>
+    <input type="hidden" id="bk_id">
+    <input type="hidden" id="bk_kind" value="bakim">
+    <input type="hidden" id="bk_task_prev">
+    <div class="fld" id="bk_deviceWrap"><label>Cihaz</label>
+      <div class="combo"><input type="text" id="bk_device_q" autocomplete="off" placeholder="cihaz ara veya seç…"><div class="combo-list" id="cl_bk_device"></div></div>
+      <input type="hidden" id="bk_device">
+    </div>
+    <div class="fld" id="bk_taskWrap" style="display:none"><label>İş</label>
+      <div class="combo"><input type="text" id="bk_task_q" autocomplete="off" placeholder="iş ara veya seç…"><div class="combo-list" id="cl_bk_task"></div></div>
+      <input type="hidden" id="bk_task">
+    </div>
+    <div class="fld"><label>Tarih</label><input type="date" id="bk_date"></div>
+    <div class="fld two">
+      <div><label>Başlangıç saati</label><input type="time" id="bk_start"></div>
+      <div><label>Bitiş saati</label><input type="time" id="bk_end"></div>
+    </div>
+    <div class="fld"><label id="bk_noteLabel">Not (firma, kapsam, bölüm müsaitliği vb.)</label><textarea id="bk_note"></textarea></div>
+    <div class="sheet-btns">
+      <button class="cancel" onclick="closeModal('bakimModal')">Vazgeç</button>
+      <button class="save" onclick="saveBakim()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Subtask modal -->
+<div class="modal" id="subModal">
+  <div class="sheet">
+    <h3>Alt görev</h3>
+    <div class="fld"><label>Alt görev</label><input type="text" id="sm_text" placeholder="ör. Yedek prob sipariş et"></div>
+    <div class="fld two">
+      <div><label>Öncelik</label><select id="sm_prio"><option value="orta">Orta</option><option value="yuksek">Yüksek</option><option value="dusuk">Düşük</option></select></div>
+      <div><label>Son tarih</label><input type="date" id="sm_due"></div>
+    </div>
+    <div class="fld"><label>Bağlı cihaz (opsiyonel)</label>
+      <div class="combo"><input type="text" id="sm_device_q" autocomplete="off" placeholder="cihaz ara veya seç…"><div class="combo-list" id="cl_sm_device"></div></div>
+      <input type="hidden" id="sm_device">
+    </div>
+    <div class="fld"><label>Süre — ne kadar sürer?</label>
+      <select id="sm_duration">
+        <option value="dakika">Dakikalar (birkaç dakikada biter)</option>
+        <option value="oturum">Tek oturum (saatler, aynı oturuşta biter)</option>
+        <option value="gunler">Günler sürer</option>
+        <option value="hafta">Haftalar+ sürer</option>
+      </select>
+    </div>
+    <div class="fld"><label>Tekrar</label>
+      <select id="sm_repeat" onchange="smToggleRepeat()">
+        <option value="tek">Tek seferlik</option>
+        <option value="haftalik">Haftalık — belirli günler</option>
+        <option value="aylik">Aylık — belirli günler</option>
+        <option value="sonra">Tamamladıktan X gün sonra</option>
+      </select>
+    </div>
+    <div class="fld" id="sm_weekly" style="display:none"><label>Haftanın günleri</label>
+      <div id="sm_weekdays" class="daypick">
+        <label><input type="checkbox" value="1">Pzt</label><label><input type="checkbox" value="2">Sal</label>
+        <label><input type="checkbox" value="3">Çar</label><label><input type="checkbox" value="4">Per</label>
+        <label><input type="checkbox" value="5">Cum</label><label><input type="checkbox" value="6">Cmt</label>
+        <label><input type="checkbox" value="0">Paz</label>
+      </div>
+    </div>
+    <div class="fld" id="sm_monthly" style="display:none"><label>Ayın günleri (virgülle: 7, 15)</label><input type="text" id="sm_monthdays" placeholder="ör. 1, 15"></div>
+    <div class="fld" id="sm_afterwrap" style="display:none"><label>Kaç gün sonra</label><input type="number" id="sm_afterdays" min="1" value="7"></div>
+    <div class="sheet-btns">
+      <button class="cancel" onclick="closeModal('subModal')">Vazgeç</button>
+      <button class="save" onclick="saveSub()">Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- Faaliyet Raporu modal -->
+<div class="modal" id="faaliyetRaporModal">
+  <div class="sheet">
+    <h3>Faaliyet Raporu Oluştur</h3>
+    <div class="fld"><label>Görevli Personel</label><input type="text" id="fr_personel" placeholder="ör. Göksel Çelik"></div>
+    <div class="fld two">
+      <div><label>Başlangıç tarihi (opsiyonel)</label><input type="date" id="fr_start"></div>
+      <div><label>Bitiş tarihi (opsiyonel)</label><input type="date" id="fr_end"></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin:-4px 0 14px;line-height:1.55">
+      Tarih boş bırakılırsa: şu an <b>açık</b> olan tüm Biyomedikal işler dahil edilir.<br>
+      Tarih girilirse: o aralıkta açılmış, kapanmış veya gelişme kaydı eklenmiş işler (tüm geçmişleriyle) listelenir.<br>
+      Her satırda bağlı cihaz bilgisi ve işin tüm gelişme günlüğü yer alır. Servis/parça ücreti sütunları boş bırakılır — elle doldurulmalıdır.
+    </div>
+    <div class="sheet-btns">
+      <button class="cancel" onclick="closeModal('faaliyetRaporModal')">Vazgeç</button>
+      <button class="save" onclick="generateFaaliyetRaporu()">Oluştur ve indir</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const DUR_W = {dakika:0, oturum:1, gunler:2, hafta:3};
+const DUR_LABEL = {dakika:'Dakikalar', oturum:'Tek oturum', gunler:'Günler', hafta:'Haftalar+'};
+const DUR_SHORT = {dakika:'dk', oturum:'oturum', gunler:'gün', hafta:'hafta+'};
+const KEY = 'envanter-v1';
+let db = { devices: [], tasks: [], shopping: [], shoppingCats: [], maintenance: [] };
+let tab = 'dev';
+let mode = 'biyomedikal';
+let histFilter = null;
+let storageWarned = false;
+
+// ── Firebase ────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:"AIzaSyCvUecfTNPwTMki0_6ObUJjAOWcMzhASNM",
+  authDomain:"kosuizi.firebaseapp.com",
+  databaseURL:"https://kosuizi-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"kosuizi",
+  storageBucket:"kosuizi.firebasestorage.app",
+  messagingSenderId:"136349255168",
+  appId:"1:136349255168:web:d6e45cbd9591f5ef5f7ae5"
+};
+const DB_PATH = 'asistan/db';
+const FLAG_PATH = 'asistan/yedekdurum';
+let fbDb = null;
+function initFirebaseApp(){
+  if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  if(!fbDb) fbDb = firebase.database();
+  return fbDb;
+}
+function handleLogin(ev){
+  ev.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = 'Giriş yapılıyor…';
+  initFirebaseApp();
+  firebase.auth().signInWithEmailAndPassword(email, pass)
+    .catch(()=>{ err.textContent = 'Giriş başarısız — e-posta veya şifre hatalı.'; })
+    .finally(()=>{ btn.disabled=false; btn.textContent='Giriş yap'; });
+}
+function handleLogout(){
+  firebase.auth().signOut();
+}
+function showLoginScreen(){
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('appRoot').classList.add('hidden');
+}
+function showApp(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appRoot').classList.remove('hidden');
+}
+
+function setMode(m){
+  // İzlem açıkken mod anahtarı filtre görevi görür
+  if(document.getElementById('view-izlem').style.display==='block'){
+    izlemFilter = (izlemFilter===m) ? null : m;
+    document.getElementById('mode-biyomedikal').classList.toggle('on', izlemFilter==='biyomedikal');
+    document.getElementById('mode-kisisel').classList.toggle('on', izlemFilter==='kisisel');
+    renderIzlem();
+    return;
+  }
+  // Plan açıkken mod anahtarı filtre görevi görür
+  if(document.getElementById('view-day').style.display==='block'){
+    planFilter = (planFilter===m) ? null : m;
+    document.getElementById('mode-biyomedikal').classList.toggle('on', planFilter==='biyomedikal');
+    document.getElementById('mode-kisisel').classList.toggle('on', planFilter==='kisisel');
+    renderDay();
+    return;
+  }
+  // Tarihçe sekmesinde mod anahtarı filtre görevi görür
+  if(tab==='hist'){
+    histFilter = (histFilter===m) ? null : m;
+    document.getElementById('mode-biyomedikal').classList.toggle('on', histFilter==='biyomedikal');
+    document.getElementById('mode-kisisel').classList.toggle('on', histFilter==='kisisel');
+    renderHistory();
+    return;
+  }
+  mode=m;
+  document.body.classList.toggle('kisisel', m==='kisisel');
+  document.getElementById('mode-biyomedikal').classList.toggle('on', m==='biyomedikal');
+  document.getElementById('mode-kisisel').classList.toggle('on', m==='kisisel');
+  document.getElementById('tab-dev').style.display = m==='biyomedikal'?'block':'none';
+  document.getElementById('tab-bakim').style.display = m==='biyomedikal'?'block':'none';
+  document.getElementById('tab-liste').style.display = m==='kisisel'?'block':'none';
+  document.getElementById('btnFaaliyetRapor').style.display = m==='biyomedikal'?'inline-block':'none';
+  if(m==='kisisel' && (tab==='dev'||tab==='bakim')) switchTab('task');
+  else if(m==='biyomedikal' && tab==='liste') switchTab('dev');
+  else renderAll();
+}
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function nowTime(){ return new Date().toTimeString().slice(0,5); }
+function now(){ const d=new Date(); return d.toISOString().slice(0,10)+' '+d.toTimeString().slice(0,5); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+function parseDateTimeInput(v){
+  const s=(v||'').trim();
+  const m=s.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?$/);
+  if(!m) return null;
+  return { date:m[1], time:m[2]||'' };
+}
+function devPlace(d){ return [d.dept,d.unit,d.loc].filter(Boolean).join(' › '); }
+function devNumsArr(d){ const a=[]; if(d.serial) a.push('SN '+esc(d.serial)); if(d.asset) a.push('DB '+esc(d.asset)); if(d.sysno) a.push('SİS '+esc(d.sysno)); return a; }
+
+async function loadDb(){
+  try{ const snap=await initFirebaseApp().ref(DB_PATH).get(); if(snap.exists()) db=snap.val(); }catch(e){ console.warn('Veri okunamadı:', e); }
+  if(!db.shopping) db.shopping=[];
+  if(!db.shoppingCats) db.shoppingCats=[{id:uid(), name:'Market'}]; // yalnızca hiç yoksa (eski yedekler dahil) bir başlangıç kategorisi
+  if(!db.maintenance) db.maintenance=[];
+  if(!db.settings) db.settings={};
+  migrateServisRecords();
+  migrateSvcDoneField();
+  scrubKisiselServis();
+  renderAll();
+}
+function migrateSvcDoneField(){
+  // Servis tamamlanma durumu artık işten ayrı bir alan (svcDone). Bu alan hiç yoksa
+  // (güncellemeden önce oluşturulmuş servis planları), eski görünümü korumak için
+  // o anki iş durumunu (done) bir kereye mahsus svcDone'a kopyala.
+  let changed=false;
+  db.tasks.forEach(t=>{
+    if(t.svcDate && t.svcDone===undefined){ t.svcDone=!!t.done; changed=true; }
+  });
+  if(changed) saveDb(true);
+}
+function scrubKisiselServis(){
+  // Servis/Bakım yalnızca Biyomedikal işleri ilgilendirir — Kişisel bir işte kalmış olabilecek servis planını temizle
+  let changed=false;
+  db.tasks.forEach(t=>{
+    if((t.type||'biyomedikal')==='kisisel' && t.svcDate){ t.svcDate=null; t.svcStart=''; t.svcEnd=''; t.svcCreated=null; changed=true; syncServisDeviceFault(t); }
+  });
+  if(changed) saveDb(true);
+}
+function migrateServisRecords(){
+  // eski sürümde "servis" bağımsız bir kayıt olarak db.maintenance içindeydi;
+  // artık işin kendi svcDate/svcStart/svcEnd/note alanlarında tutuluyor — bir kereye mahsus taşı
+  if(!Array.isArray(db.maintenance)) { db.maintenance=[]; return; }
+  const hasOld = db.maintenance.some(x=>x.kind==='servis');
+  if(!hasOld) return;
+  const keep=[];
+  db.maintenance.forEach(item=>{
+    if(item.kind==='servis'){
+      const t=item.task?db.tasks.find(x=>x.id===item.task):null;
+      if(t && !t.svcDate && (t.type||'biyomedikal')==='biyomedikal'){
+        t.svcDate=item.date||null; t.svcStart=item.start||''; t.svcEnd=item.end||'';
+        if(item.note && !t.note) t.note=item.note;
+        t.svcDone=!!item.done; // eski bağımsız kaydın kendi tamamlanma durumu — artık kaybolmasın
+      }
+    } else { keep.push(item); }
+  });
+  db.maintenance=keep;
+  db.devices.forEach(d=>{ if(d.faults) d.faults=d.faults.filter(f=>!f.faaliyetId || db.maintenance.some(m=>m.id===f.faaliyetId)); });
+  db.tasks.forEach(t=>{ if(t.svcDate) syncServisDeviceFault(t); });
+  saveDb(true);
+}
+const FLAG_KEY = 'envanter-v1-yedekdurum';
+let backedUp = true;
+async function loadBackupFlag(){
+  try{ const snap=await initFirebaseApp().ref(FLAG_PATH).get(); if(snap.exists()) backedUp = !!(snap.val()||{}).backedUp; }
+  catch(e){}
+  renderBackupBadge();
+}
+async function saveBackupFlag(){
+  try{ await initFirebaseApp().ref(FLAG_PATH).set({backedUp}); }catch(e){}
+}
+function markDirty(){
+  backedUp=false; renderBackupBadge(); saveBackupFlag();
+}
+function markBackedUp(){
+  backedUp=true; renderBackupBadge(); saveBackupFlag();
+}
+function renderBackupBadge(){
+  const el=document.getElementById('backupBadge'); if(!el) return;
+  el.textContent = backedUp ? '● Yedeklendi' : '● Yedeklenmedi';
+  el.classList.toggle('ok', backedUp);
+  el.classList.toggle('bad', !backedUp);
+}
+async function saveDb(skipDirty){
+  if(!skipDirty) markDirty();
+  try{ await initFirebaseApp().ref(DB_PATH).set(JSON.parse(JSON.stringify(db))); }
+  catch(e){ if(!storageWarned){storageWarned=true; toast('Kayıt hatası — sık sık Dışa aktar yap');} }
+}
+function toast(t){ const e=document.getElementById('toast'); e.textContent=t; e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),2500); }
+
+function switchTab(t){
+  tab=t;
+  document.getElementById('view-day').style.display='none';
+  document.getElementById('view-izlem').style.display='none';
+  document.getElementById('view-dev').style.display = t==='dev'?'block':'none';
+  document.getElementById('view-bakim').style.display = t==='bakim'?'block':'none';
+  document.getElementById('view-liste').style.display = t==='liste'?'block':'none';
+  document.getElementById('view-task').style.display = t==='task'?'block':'none';
+  document.getElementById('view-rep').style.display = t==='rep'?'block':'none';
+  document.getElementById('view-hist').style.display = t==='hist'?'block':'none';
+  document.querySelector('.tabs').style.display='flex';
+  ['dev','bakim','liste','task','rep','hist'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('on', x===t));
+  document.body.classList.toggle('tarihce', t==='hist');
+  document.body.classList.toggle('kisisel', t!=='hist' && mode==='kisisel');
+  if(t==='hist'){
+    document.getElementById('mode-biyomedikal').classList.toggle('on', histFilter==='biyomedikal');
+    document.getElementById('mode-kisisel').classList.toggle('on', histFilter==='kisisel');
+  } else {
+    document.getElementById('mode-biyomedikal').classList.toggle('on', mode==='biyomedikal');
+    document.getElementById('mode-kisisel').classList.toggle('on', mode==='kisisel');
+  }
+  if(t==='dev') renderDevices();
+  if(t==='bakim') renderBakim();
+  if(t==='liste') renderListe();
+  if(t==='task') renderTasks();
+  if(t==='rep') renderReport();
+  if(t==='hist') renderHistory();
+}
+function openPlan(){
+  document.getElementById('view-dev').style.display='none';
+  document.getElementById('view-bakim').style.display='none';
+  document.getElementById('view-liste').style.display='none';
+  document.getElementById('view-task').style.display='none';
+  document.getElementById('view-rep').style.display='none';
+  document.getElementById('view-hist').style.display='none';
+  document.getElementById('view-izlem').style.display='none';
+  document.getElementById('view-day').style.display='block';
+  document.querySelector('.tabs').style.display='none';
+  document.body.classList.remove('kisisel');
+  document.body.classList.remove('tarihce');
+  document.body.classList.remove('izlem');
+  document.body.classList.add('plan');
+  document.getElementById('mode-biyomedikal').classList.toggle('on', planFilter==='biyomedikal');
+  document.getElementById('mode-kisisel').classList.toggle('on', planFilter==='kisisel');
+  renderDay();
+}
+function closePlan(){
+  document.body.classList.remove('plan');
+  document.body.classList.toggle('kisisel', mode==='kisisel');
+  switchTab(tab);
+}
+
+let izlemFilter=null;
+function openIzlem(){
+  document.getElementById('view-dev').style.display='none';
+  document.getElementById('view-bakim').style.display='none';
+  document.getElementById('view-liste').style.display='none';
+  document.getElementById('view-task').style.display='none';
+  document.getElementById('view-rep').style.display='none';
+  document.getElementById('view-hist').style.display='none';
+  document.getElementById('view-day').style.display='none';
+  document.getElementById('view-izlem').style.display='block';
+  document.querySelector('.tabs').style.display='none';
+  document.body.classList.remove('kisisel');
+  document.body.classList.remove('tarihce');
+  document.body.classList.remove('plan');
+  document.body.classList.add('izlem');
+  document.getElementById('mode-biyomedikal').classList.toggle('on', izlemFilter==='biyomedikal');
+  document.getElementById('mode-kisisel').classList.toggle('on', izlemFilter==='kisisel');
+  renderIzlem();
+}
+function closeIzlem(){
+  document.body.classList.remove('izlem');
+  document.body.classList.toggle('kisisel', mode==='kisisel');
+  switchTab(tab);
+}
+function izlemGoToTask(id){
+  const t=db.tasks.find(x=>x.id===id); if(!t){ toast('İş bulunamadı (silinmiş olabilir)'); return; }
+  document.getElementById('view-izlem').style.display='none';
+  document.body.classList.remove('izlem');
+  const targetMode=t.type||'biyomedikal';
+  if(mode!==targetMode) setMode(targetMode);
+  document.getElementById('taskSearch').value='';
+  document.getElementById('taskFilter').value='acik';
+  switchTab('task');
+  document.getElementById('texp-'+id)?.classList.add('open');
+  setTimeout(()=>{ document.getElementById('texp-'+id)?.scrollIntoView({behavior:'smooth', block:'center'}); },60);
+}
+function renderIzlem(){
+  const box=document.getElementById('view-izlem');
+  const t=today();
+  const pOrder={yuksek:0,orta:1,dusuk:2};
+  const items=[];
+  db.tasks.filter(x=>!x.done).forEach(x=>{
+    try{
+      const subsArr = Array.isArray(x.subtasks) ? x.subtasks : [];
+      const openSubs = subsArr.filter(s=>s && !s.done);
+      if(openSubs.length){
+        openSubs.forEach(s=>{
+          items.push({ kind:'alt', id:x.id, type:x.type||'biyomedikal', title:s.text||'(başlıksız alt görev)', parent:x.title, prio:s.prio||'orta', due:s.due,
+            dur:s.duration||'oturum', dev:s.device?db.devices.find(d=>d.id===s.device):null, created:x.created });
+        });
+      } else {
+        items.push({ kind:'iş', id:x.id, type:x.type||'biyomedikal', title:x.title, prio:x.prio, due:x.due,
+          dur:x.duration||'oturum', dev:x.device?db.devices.find(d=>d.id===x.device):null, created:x.created });
+      }
+    }catch(e){
+      // Beklenmedik/bozuk veri bu işi listeden tamamen düşürmesin — en azından iş kendisi görünsün
+      console.warn('İzlem: bir iş işlenirken hata, iş kendisi gösteriliyor', x, e);
+      items.push({ kind:'iş', id:x.id, type:x.type||'biyomedikal', title:x.title||'(başlıksız iş)', prio:x.prio||'orta', due:x.due,
+        dur:x.duration||'oturum', dev:null, created:x.created });
+    }
+  });
+  const URGENT_DAYS=3;
+  const rank=it=>{
+    const dw=DUR_W[it.dur||'oturum'];
+    if(it.due){
+      const d=daysBetween(t,it.due);
+      if(d<=URGENT_DAYS) return [0, d, pOrder[it.prio], dw];
+    }
+    return [1, dw, pOrder[it.prio], it.due?daysBetween(t,it.due):999];
+  };
+  const cmp=(a,b)=>{ const ra=rank(a),rb=rank(b); for(let i=0;i<ra.length;i++){ if(ra[i]!==rb[i]) return ra[i]-rb[i]; } return 0; };
+  const filtered = izlemFilter ? items.filter(i=>i.type===izlemFilter) : items;
+  const all=filtered.slice().sort(cmp);
+
+  const sizeClass={dakika:'iz-s',oturum:'iz-m',gunler:'iz-l',hafta:'iz-xl'};
+  const dotColor={yuksek:'var(--red)',orta:'var(--amber)',dusuk:'var(--dim)'};
+  const urgClass=it=>{
+    if(!it.due) return 'iz-u-none';
+    const d=daysBetween(t,it.due);
+    if(d<0) return 'iz-u-over';
+    if(d===0) return 'iz-u-today';
+    if(d<=3) return 'iz-u-soon';
+    return 'iz-u-later';
+  };
+  const dueTxt=it=>{
+    if(!it.due) return '';
+    const d=daysBetween(t,it.due);
+    if(d<0) return `⚠ ${-d}g geçti`;
+    if(d===0) return `⚠ bugün`;
+    return `${d}g kaldı`;
+  };
+
+  const card=it=>{
+    const sc=sizeClass[it.dur||'oturum'];
+    const uc=urgClass(it);
+    const age = it.created ? daysBetween(it.created,t) : null;
+    return `<div class="izlem-card ${sc} ${uc}" onclick="izlemGoToTask('${it.id}')">
+      <div class="izlem-top">
+        <span class="izlem-type ${it.type==='kisisel'?'k':'b'}">${it.type==='kisisel'?'K':'B'}</span>
+        <span class="izlem-dot" style="background:${dotColor[it.prio]}"></span>
+      </div>
+      <div>
+        ${it.parent?`<div class="izlem-parent">${esc(it.parent)}</div>`:''}
+        <div class="izlem-title">${it.kind==='alt'?'↳ ':''}${esc(it.title)}</div>
+      </div>
+      <div class="izlem-bottom">
+        ${it.dev?`<span>${esc(it.dev.name)}</span>`:''}
+        ${age!=null?`<span>${age}g açık</span>`:''}
+        ${dueTxt(it)?`<span>${dueTxt(it)}</span>`:''}
+      </div>
+    </div>`;
+  };
+
+  box.innerHTML=`
+    <div class="day-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <div class="day-date">Genel İzlem</div>
+        <div class="day-sub">${all.length} açık madde — boyut süreyi, renk aciliyeti gösterir</div>
+      </div>
+      <button onclick="closeIzlem()" style="flex:0 0 auto;border:1px solid var(--accent-dim);background:var(--surface);color:var(--accent);border-radius:9px;padding:8px 14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px">✕ Kapat</button>
+    </div>
+    <div class="izlem-legend">
+      <b>Boyut</b> = süre — küçük kare: dakikalar, en büyük blok: haftalar+ &nbsp;·&nbsp;
+      <b>Renk</b> — <span style="color:var(--red)">kırmızı</span>: geçti/bugün, <span style="color:var(--amber)">turuncu</span>: ≤3 gün kaldı, nötr: uzak/son tarih yok &nbsp;·&nbsp;
+      <b>Nokta</b> = öncelik &nbsp;·&nbsp; <b>B/K</b> = Biyomedikal/Kişisel
+    </div>
+    ${all.length? `<div class="izlem-grid">${all.map(card).join('')}</div>` : `<div class="empty" style="padding:40px 10px">${izlemFilter?'Bu türde açık madde yok.':'Açık iş yok. Güzel — kafan net.'}</div>`}`;
+}
+
+
+/* ---------- FAALİYET (bakım + servis planlama, takvim) ---------- */
+let bakimCursor=null, bakimSelDate=null;
+
+/* ---- Bakım: cihaza bağlı, db.maintenance içinde bağımsız kayıt ---- */
+function bakimFaultText(item){
+  const when = `${item.date}${item.start?' '+item.start:''}${item.end?'–'+item.end:''}`;
+  const note = item.note?': '+item.note:'';
+  const doneTag = item.done?' — Tamamlandı':'';
+  return `[Bakım] ${when}${note}${doneTag}`;
+}
+function syncFaaliyetDeviceFault(item){
+  db.devices.forEach(d=>{ if(d.faults) d.faults=d.faults.filter(f=>f.faaliyetId!==item.id); });
+  if(!item.device) return;
+  const dev=db.devices.find(d=>d.id===item.device); if(!dev) return;
+  if(!dev.faults) dev.faults=[];
+  // "when" = bu bakım planının OLUŞTURULDUĞU tarih (Tarihçe'de solda görünen). Planlanan tarih zaten metnin içinde (bakimFaultText).
+  const stamp = item.created ? item.created+(item.createdTime?' '+item.createdTime:'') : item.date+(item.start?' '+item.start:'');
+  dev.faults.unshift({ id:uid(), when:stamp, what:bakimFaultText(item), faaliyetId:item.id });
+}
+function openBakimModal(dateStr, deviceId){
+  document.getElementById('bakimModal').classList.add('open');
+  document.getElementById('bakimModalTitle').textContent='Yeni bakım';
+  document.getElementById('bk_id').value='';
+  document.getElementById('bk_kind').value='bakim';
+  document.getElementById('bk_deviceWrap').style.display='block';
+  document.getElementById('bk_taskWrap').style.display='none';
+  document.getElementById('bk_noteLabel').textContent='Not (firma, kapsam, bölüm müsaitliği vb.)';
+  deviceComboSetVisual('bk_device_q','bk_device',deviceId||null);
+  document.getElementById('bk_date').value=dateStr||bakimSelDate||today();
+  document.getElementById('bk_start').value='';
+  document.getElementById('bk_end').value='';
+  document.getElementById('bk_note').value='';
+}
+function quickBakim(deviceId){
+  switchTab('bakim');
+  openBakimModal(null, deviceId);
+}
+function editBakim(id){
+  const b=db.maintenance.find(x=>x.id===id); if(!b) return;
+  document.getElementById('bakimModal').classList.add('open');
+  document.getElementById('bakimModalTitle').textContent='Bakımı düzenle';
+  document.getElementById('bk_id').value=id;
+  document.getElementById('bk_kind').value='bakim';
+  document.getElementById('bk_deviceWrap').style.display='block';
+  document.getElementById('bk_taskWrap').style.display='none';
+  document.getElementById('bk_noteLabel').textContent='Not (firma, kapsam, bölüm müsaitliği vb.)';
+  deviceComboSetVisual('bk_device_q','bk_device',b.device||null);
+  document.getElementById('bk_date').value=b.date;
+  document.getElementById('bk_start').value=b.start||'';
+  document.getElementById('bk_end').value=b.end||'';
+  document.getElementById('bk_note').value=b.note||'';
+}
+function toggleFaaliyetDone(id){
+  const item=db.maintenance.find(x=>x.id===id); if(!item) return;
+  item.done=!item.done; item.closed=item.done?today():null;
+  syncFaaliyetDeviceFault(item);
+  saveDb(); renderBakim();
+}
+function delBakim(id){
+  if(!confirm('Bu bakım kaydı silinsin mi?')) return;
+  db.devices.forEach(d=>{ if(d.faults) d.faults=d.faults.filter(f=>f.faaliyetId!==id); });
+  db.maintenance=db.maintenance.filter(x=>x.id!==id); saveDb(); renderBakim();
+}
+
+/* ---- Servis: ayrı bir kayıt DEĞİL — doğrudan ilgili işin (task) svcDate/svcStart/svcEnd/note alanlarında yaşar.
+   Böylece İşler sekmesindeki iş kartı ile Faaliyet'teki servis kartı birebir aynı veriyi gösterir;
+   biri düzenlenince diğeri de otomatik güncellenir. ---- */
+function servisFaultText(t){
+  const when = `${t.svcDate}${t.svcStart?' '+t.svcStart:''}${t.svcEnd?'–'+t.svcEnd:''}`;
+  const note = t.note?': '+t.note:'';
+  const doneTag = t.svcDone?' — Tamamlandı':'';
+  return `[Servis — İş: ${t.title}] ${when}${note}${doneTag}`;
+}
+function syncServisDeviceFault(t){
+  db.devices.forEach(d=>{ if(d.faults) d.faults=d.faults.filter(f=>f.servisTaskId!==t.id); });
+  if(!t.svcDate || !t.device) return;
+  const dev=db.devices.find(d=>d.id===t.device); if(!dev) return;
+  if(!dev.faults) dev.faults=[];
+  // "when" = bu servis planının OLUŞTURULDUĞU tarih (Tarihçe'de solda görünen). Planlanan tarih zaten metnin içinde (servisFaultText).
+  const stamp = t.svcCreated || (t.svcDate+(t.svcStart?' '+t.svcStart:''));
+  dev.faults.unshift({ id:uid(), when:stamp, what:servisFaultText(t), servisTaskId:t.id });
+}
+function openServisModal(taskId, defaultDate){
+  document.getElementById('bakimModal').classList.add('open');
+  document.getElementById('bk_id').value='';
+  document.getElementById('bk_kind').value='servis';
+  document.getElementById('bk_deviceWrap').style.display='none';
+  document.getElementById('bk_taskWrap').style.display='block';
+  document.getElementById('bk_noteLabel').textContent='İş notu (bu işin kendi notuyla ortaktır)';
+  document.getElementById('bk_task_prev').value=taskId||'';
+  taskComboSetVisual('bk_task_q','bk_task',taskId||null);
+  const t=taskId?db.tasks.find(x=>x.id===taskId):null;
+  document.getElementById('bakimModalTitle').textContent = (t&&t.svcDate) ? 'Servisi düzenle' : 'Yeni servis';
+  document.getElementById('bk_date').value = (t&&t.svcDate) ? t.svcDate : (defaultDate||bakimSelDate||today());
+  document.getElementById('bk_start').value = (t&&t.svcStart) ? t.svcStart : '';
+  document.getElementById('bk_end').value = (t&&t.svcEnd) ? t.svcEnd : '';
+  document.getElementById('bk_note').value = t ? (t.note||'') : '';
+}
+function quickServis(taskId){
+  const t=db.tasks.find(x=>x.id===taskId);
+  if(t && (t.type||'biyomedikal')==='kisisel'){ toast('Servis yalnızca Biyomedikal işler için kullanılabilir'); return; }
+  if(mode!=='biyomedikal') setMode('biyomedikal'); // Faaliyet sekmesi sadece biyomedikal modda var
+  switchTab('bakim');
+  openServisModal(taskId);
+}
+function toggleServisDone(taskId){
+  // Servisin tamamlanma durumu işin kendi "done" alanından bağımsızdır — işi kapatmaz, geri açmaz.
+  const t=db.tasks.find(x=>x.id===taskId); if(!t) return;
+  t.svcDone=!t.svcDone;
+  if(!t.log) t.log=[];
+  const entry={ id:uid(), when:now(), what: t.svcDone?'Servis tamamlandı.':'Servis geri açıldı.', auto:true };
+  t.log.unshift(entry);
+  syncLogEntryToDevice(t, entry);
+  syncServisDeviceFault(t);
+  saveDb(); renderBakim(); if(tab==='task') renderTasks();
+}
+function clearServis(taskId){
+  const t=db.tasks.find(x=>x.id===taskId); if(!t) return;
+  if(!confirm('Bu işin servis planı kaldırılsın mı? (İşin kendisi silinmeyecek)')) return;
+  t.svcDate=null; t.svcStart=''; t.svcEnd=''; t.svcCreated=null; t.svcDone=false;
+  if(!t.log) t.log=[];
+  const entry={ id:uid(), when:now(), what:'Servis planı kaldırıldı.', auto:true };
+  t.log.unshift(entry);
+  syncServisDeviceFault(t); // önce servis planı işaretini cihazdan temizle
+  syncLogEntryToDevice(t, entry); // sonra "kaldırıldı" notunu ayrı bir kayıt olarak ekle
+  saveDb(); renderBakim(); if(tab==='task') renderTasks();
+}
+
+function saveBakim(){
+  const kind=document.getElementById('bk_kind').value||'bakim';
+  const date=document.getElementById('bk_date').value;
+  if(!date){ toast('Tarih girin'); return; }
+  const start=document.getElementById('bk_start').value||'';
+  const end=document.getElementById('bk_end').value||'';
+  const note=document.getElementById('bk_note').value.trim();
+
+  if(kind==='servis'){
+    const taskId=document.getElementById('bk_task').value;
+    if(!taskId){ toast('İş seçin'); return; }
+    const t=db.tasks.find(x=>x.id===taskId); if(!t){ toast('İş bulunamadı'); return; }
+    if((t.type||'biyomedikal')==='kisisel'){ toast('Servis yalnızca Biyomedikal işler için kullanılabilir'); return; }
+    if(t.done && !confirm(`"${t.title}" işi zaten Tamamlandı olarak işaretli. Yine de bu iş için servis planlansın mı?`)) return;
+    const prevTaskId=document.getElementById('bk_task_prev').value;
+    if(prevTaskId && prevTaskId!==taskId){
+      const prevT=db.tasks.find(x=>x.id===prevTaskId);
+      if(prevT){ prevT.svcDate=null; prevT.svcStart=''; prevT.svcEnd=''; syncServisDeviceFault(prevT); }
+    }
+    const isNew=!t.svcDate;
+    const changed = isNew || t.svcDate!==date || t.svcStart!==start;
+    t.svcDate=date; t.svcStart=start; t.svcEnd=end; t.note=note;
+    if(isNew) t.svcCreated=now(); // planın ilk oluşturulduğu an — Tarihçe'de bu tarih gösterilir
+    if(changed) t.svcDone=false; // yeni/yeniden planlanan servis tekrar açık sayılır
+    if(changed){
+      if(!t.log) t.log=[];
+      const entry={ id:uid(), when:now(), what:`${date} tarihine ${start||'belirtilmeyen'} saatinde servis planlandı.`, auto:true };
+      t.log.unshift(entry);
+      syncLogEntryToDevice(t, entry);
+    }
+    syncServisDeviceFault(t);
+    saveDb(); closeModal('bakimModal');
+    bakimSelDate=date; const dd=new Date(date+'T12:00:00'); bakimCursor={y:dd.getFullYear(), m:dd.getMonth()};
+    renderBakim(); if(tab==='task') renderTasks();
+    toast(isNew?'Servis planlandı':'Servis güncellendi');
+    return;
+  }
+
+  const device=document.getElementById('bk_device').value;
+  if(!device){ toast('Cihaz seçin'); return; }
+  const id=document.getElementById('bk_id').value;
+  const fields={ kind:'bakim', device, date, start, end, note };
+  let item, changed;
+  if(id){
+    item=db.maintenance.find(x=>x.id===id);
+    changed = item.date!==date || item.start!==start;
+    Object.assign(item, fields);
+  } else {
+    item={ id:uid(), ...fields, done:false, closed:null, created:today(), createdTime:nowTime() };
+    db.maintenance.push(item);
+    changed=true;
+  }
+  syncFaaliyetDeviceFault(item);
+  if(changed){
+    const dev=db.devices.find(d=>d.id===device);
+    if(dev){
+      if(!dev.faults) dev.faults=[];
+      dev.faults.unshift({ id:uid(), when:now(), what:`${date} tarihine ${start||'belirtilmeyen'} saatinde bakım planlandı.` });
+    }
+  }
+  saveDb(); closeModal('bakimModal');
+  bakimSelDate=date;
+  const dd=new Date(date+'T12:00:00'); bakimCursor={y:dd.getFullYear(), m:dd.getMonth()};
+  renderBakim();
+  toast(id?'Bakım güncellendi':'Bakım eklendi');
+}
+
+function bakimNav(delta){
+  let m=bakimCursor.m+delta, y=bakimCursor.y;
+  if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
+  bakimCursor={y,m}; renderBakim();
+}
+function bakimToday(){
+  const d=new Date(); bakimCursor={y:d.getFullYear(),m:d.getMonth()}; bakimSelDate=today(); renderBakim();
+}
+function bakimSelectDay(dateStr){ bakimSelDate=dateStr; renderBakim(); }
+function goToDeviceCard(deviceId){
+  const d=db.devices.find(x=>x.id===deviceId);
+  if(!d){ toast('Cihaz bulunamadı (silinmiş olabilir)'); return; }
+  if(mode!=='biyomedikal') setMode('biyomedikal');
+  document.getElementById('devSearch').value='';
+  document.getElementById('devFilter').value='';
+  switchTab('dev');
+  document.getElementById('exp-'+deviceId)?.classList.add('open');
+  setTimeout(()=>{ document.getElementById('exp-'+deviceId)?.scrollIntoView({behavior:'smooth', block:'center'}); },60);
+}
+function faaliyetItems(){
+  const bakimItems=db.maintenance.map(b=>({ kind:'bakim', id:b.id, device:b.device, date:b.date, start:b.start, end:b.end, note:b.note, done:!!b.done }));
+  const servisItems=db.tasks.filter(t=>t.svcDate && (t.type||'biyomedikal')==='biyomedikal').map(t=>({ kind:'servis', id:'task-'+t.id, task:t, device:t.device||null, date:t.svcDate, start:t.svcStart||'', end:t.svcEnd||'', note:t.note||'', done:!!t.svcDone }));
+  return bakimItems.concat(servisItems);
+}
+function renderBakim(){
+  if(!bakimCursor){ const d=new Date(); bakimCursor={y:d.getFullYear(),m:d.getMonth()}; }
+  if(!bakimSelDate) bakimSelDate=today();
+  const box=document.getElementById('view-bakim'); if(!box) return;
+  const {y,m}=bakimCursor;
+  const monthNames=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  const first=new Date(y,m,1);
+  const startOffset=(first.getDay()+6)%7; // Pazartesi ile başla
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const prevDaysInMonth=new Date(y,m,0).getDate();
+  const t=today();
+
+  const all=faaliyetItems();
+  const byDate={};
+  all.forEach(b=>{ (byDate[b.date]=byDate[b.date]||[]).push(b); });
+
+  let cells='';
+  for(let i=startOffset-1;i>=0;i--){
+    cells+=`<div class="cal-day other"><div class="cal-daynum">${prevDaysInMonth-i}</div></div>`;
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const items=byDate[ds]||[];
+    cells+=`<div class="cal-day ${ds===t?'today':''} ${ds===bakimSelDate?'sel':''}" onclick="bakimSelectDay('${ds}')">
+      <div class="cal-daynum">${d}</div>
+      ${items.length?`<div class="cal-dot-wrap">${items.slice(0,4).map(it=>`<span class="cal-dot" style="background:${it.done?'var(--dim)':(it.kind==='servis'?'var(--blue)':'var(--accent)')}"></span>`).join('')}</div>`:''}
+    </div>`;
+  }
+  const totalCells=startOffset+daysInMonth;
+  const trailing=(7-(totalCells%7))%7;
+  for(let d=1; d<=trailing; d++){
+    cells+=`<div class="cal-day other"><div class="cal-daynum">${d}</div></div>`;
+  }
+
+  const dayNames=['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+  const selItems=(byDate[bakimSelDate]||[]).slice().sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const dObj=new Date(bakimSelDate+'T12:00:00');
+  const gunAdi=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][dObj.getDay()];
+
+  const itemRow=b=>{
+    const dev=b.device?db.devices.find(x=>x.id===b.device):null;
+    const kind=b.kind;
+    const navCall = kind==='servis' ? (b.task?`planGoToTask('${b.task.id}')`:null) : (dev?`goToDeviceCard('${dev.id}')`:null);
+    const titleTxt = kind==='servis' ? b.task.title : (dev?dev.name:'(silinmiş cihaz)');
+    const subParts=[];
+    if(kind==='servis' && dev) subParts.push(dev.name+(devPlace(dev)?' · '+devPlace(dev):''));
+    if(kind==='bakim' && dev && devPlace(dev)) subParts.push(devPlace(dev));
+    const kindTag = kind==='servis' ? `<span class="tag-mini" style="background:var(--surface2);color:var(--blue)">Servis</span>` : `<span class="tag-mini b">Bakım</span>`;
+    const btns = kind==='servis'
+      ? `<button onclick="event.stopPropagation();toggleServisDone('${b.task.id}')">${b.done?'Geri aç':'Tamamlandı'}</button>
+         <button onclick="event.stopPropagation();openServisModal('${b.task.id}')">Düzenle</button>
+         <button class="danger" onclick="event.stopPropagation();clearServis('${b.task.id}')">Planı kaldır</button>`
+      : `<button onclick="event.stopPropagation();toggleFaaliyetDone('${b.id}')">${b.done?'Geri aç':'Tamamlandı'}</button>
+         <button onclick="event.stopPropagation();editBakim('${b.id}')">Düzenle</button>
+         <button class="danger" onclick="event.stopPropagation();delBakim('${b.id}')">Sil</button>`;
+    return `<div class="card" style="margin-bottom:8px${navCall?';cursor:pointer':''}${b.done?';opacity:.6':''}" ${navCall?`onclick="${navCall}"`:''}>
+      <div class="dev-head">
+        <div class="dev-title">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${kindTag}
+            ${b.done?'<span class="tag-mini d">✓ Tamamlandı</span>':''}
+          </div>
+          <div class="name" style="font-size:14px;margin-top:4px;${b.done?'text-decoration:line-through;color:var(--dim)':''}">${esc(titleTxt)}</div>
+          ${subParts.length?`<div class="sub">${esc(subParts.join(' · '))}</div>`:''}
+          <div class="dev-nums">${b.start||'saat belirtilmedi'}${b.end?' – '+esc(b.end):''}</div>
+          ${b.note?`<div style="font-size:12.5px;color:var(--muted);margin-top:5px">${esc(b.note)}</div>`:''}
+        </div>
+      </div>
+      <div class="rowbtns">${btns}</div>
+    </div>`;
+  };
+
+  const bakimCount=db.maintenance.length;
+  const servisCount=all.filter(x=>x.kind==='servis').length;
+  const doneCount=all.filter(x=>x.done).length;
+
+  box.innerHTML=`
+    <div class="bar">
+      <div style="flex:1;font-size:13px;color:var(--muted)">${bakimCount} kayıtlı bakım · ${servisCount} kayıtlı servis${doneCount?' · '+doneCount+' tamamlandı':''}</div>
+      <button class="addbtn" onclick="openBakimModal(bakimSelDate)">+ Bakım</button>
+      <button class="addbtn" onclick="openServisModal(null,bakimSelDate)">+ Servis</button>
+    </div>
+    <div class="cal-nav">
+      <button onclick="bakimNav(-1)">‹</button>
+      <div class="cal-title">${monthNames[m]} ${y}</div>
+      <button onclick="bakimNav(1)">›</button>
+    </div>
+    <div class="cal-grid" style="margin-bottom:4px">${dayNames.map(n=>`<div class="cal-head">${n}</div>`).join('')}</div>
+    <div class="cal-grid">${cells}</div>
+    <div style="text-align:center;margin:10px 0 4px"><button onclick="bakimToday()" style="border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif">Bugün</button></div>
+    <div class="sectlabel" style="margin-top:16px">${gunAdi} · ${bakimSelDate}</div>
+    ${selItems.length? selItems.map(itemRow).join('') : `<div class="empty">Bu günde faaliyet yok.</div>`}
+  `;
+}
+
+/* ---------- DEVICES ---------- */
+const COMBO_FIELDS=[{input:'f_name',key:'name'},{input:'f_brand',key:'brand'},{input:'f_model',key:'model'},{input:'f_dept',key:'dept'},{input:'f_unit',key:'unit'},{input:'f_loc',key:'loc'}];
+function comboOptions(key){
+  return [...new Set(db.devices.map(d=>(d[key]||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+}
+function comboRender(inputId,key){
+  const inp=document.getElementById(inputId), list=document.getElementById('cl_'+inputId);
+  const q=inp.value.trim().toLocaleLowerCase('tr');
+  const opts=comboOptions(key).filter(o=>!q||o.toLocaleLowerCase('tr').includes(q));
+  if(!opts.length){ list.classList.remove('open'); list.innerHTML=''; return; }
+  list.innerHTML=opts.map(o=>`<div class="combo-item" data-value="${esc(o)}">${esc(o)}</div>`).join('');
+  list.classList.add('open');
+}
+let comboInited=false;
+function comboInit(){
+  if(comboInited) return; comboInited=true;
+  COMBO_FIELDS.forEach(({input,key})=>{
+    const inp=document.getElementById(input), list=document.getElementById('cl_'+input);
+    inp.addEventListener('focus',()=>comboRender(input,key));
+    inp.addEventListener('input',()=>comboRender(input,key));
+    inp.addEventListener('blur',()=>setTimeout(()=>list.classList.remove('open'),150));
+    list.addEventListener('mousedown',e=>{
+      const item=e.target.closest('.combo-item'); if(!item) return;
+      e.preventDefault(); inp.value=item.dataset.value; list.classList.remove('open');
+    });
+  });
+}
+function openDeviceModal(id){
+  document.getElementById('devModal').classList.add('open');
+  const d = id ? db.devices.find(x=>x.id===id) : null;
+  document.getElementById('devModalTitle').textContent = d ? 'Cihazı düzenle' : 'Yeni cihaz';
+  document.getElementById('devId').value = d?d.id:'';
+  const set=(k,v)=>document.getElementById(k).value=v||'';
+  set('f_name',d?.name); set('f_brand',d?.brand); set('f_model',d?.model);
+  set('f_serial',d?.serial); set('f_asset',d?.asset); set('f_sysno',d?.sysno); set('f_dept',d?.dept); set('f_unit',d?.unit); set('f_loc',d?.loc);
+  document.getElementById('f_status').value = d?.status||'faal';
+  document.getElementById('f_contract').value = d?.contract||'yok';
+  set('f_scope',d?.scope); set('f_cstart',d?.cstart); set('f_cend',d?.cend); set('f_note',d?.note); set('f_coverage',d?.coverage);
+  toggleContractFields();
+}
+function toggleContractFields(){
+  document.getElementById('contractFields').style.display =
+    document.getElementById('f_contract').value==='var' ? 'block':'none';
+}
+function saveDevice(){
+  const name=document.getElementById('f_name').value.trim();
+  if(!name){ toast('Cihaz adı gerekli'); return; }
+  const id=document.getElementById('devId').value;
+  const g=k=>document.getElementById(k).value.trim();
+  const data={ name, brand:g('f_brand'), model:g('f_model'), serial:g('f_serial'), asset:g('f_asset'), sysno:g('f_sysno'),
+    dept:g('f_dept'), unit:g('f_unit'), loc:g('f_loc'), status:document.getElementById('f_status').value,
+    contract:document.getElementById('f_contract').value, coverage:document.getElementById('f_coverage').value, scope:g('f_scope'),
+    cstart:g('f_cstart'), cend:g('f_cend'), note:g('f_note') };
+  if(id){ const d=db.devices.find(x=>x.id===id); Object.assign(d,data); }
+  else { db.devices.unshift({ id:uid(), ...data, faults:[], created:today(), createdTime:nowTime() }); }
+  saveDb(); closeModal('devModal'); renderDevices(); toast(id?'Güncellendi':'Cihaz eklendi');
+}
+function delDevice(id){
+  if(!confirm('Bu cihaz ve tüm arıza geçmişi silinsin mi?')) return;
+  db.devices=db.devices.filter(x=>x.id!==id); saveDb(); renderDevices();
+}
+function toggleExpand(id){ document.getElementById('exp-'+id).classList.toggle('open'); }
+function addFault(id){
+  const inp=document.getElementById('fi-'+id); const v=inp.value.trim(); if(!v) return;
+  const d=db.devices.find(x=>x.id===id);
+  d.faults.unshift({ id:uid(), when:now(), what:v });
+  inp.value=''; saveDb(); renderDevices();
+  const again=document.getElementById('exp-'+id); if(again) again.classList.add('open');
+  const fi=document.getElementById('fi-'+id); if(fi) fi.focus();
+}
+function editFaultWhen(did,fid){
+  const d=db.devices.find(x=>x.id===did); if(!d) return;
+  const f=(d.faults||[]).find(x=>x.id===fid); if(!f) return;
+  const v=prompt('Tarih/saat (YYYY-AA-GG SS:DD):', f.when);
+  if(v===null) return;
+  const p=parseDateTimeInput(v);
+  if(!p){ toast('Geçersiz biçim — YYYY-AA-GG SS:DD kullan'); return; }
+  f.when = p.time ? p.date+' '+p.time : p.date;
+  if(f.fromTask){
+    const t=db.tasks.find(x=>x.id===f.fromTask);
+    const l=t&&t.log?t.log.find(x=>x.id===fid):null;
+    if(l) l.when=f.when;
+  }
+  saveDb(); renderDevices();
+  document.getElementById('exp-'+did)?.classList.add('open');
+  if(tab==='hist') renderHistory();
+}
+function delFault(did,fid){
+  const d=db.devices.find(x=>x.id===did); if(!d) return;
+  const f=(d.faults||[]).find(x=>x.id===fid);
+  if(f){
+    if(f.fromTask){
+      const t=db.tasks.find(x=>x.id===f.fromTask);
+      if(t && t.log) t.log=t.log.filter(l=>l.id!==fid);
+    }
+    if(f.servisTaskId){
+      const t=db.tasks.find(x=>x.id===f.servisTaskId);
+      if(t){
+        t.svcDate=null; t.svcStart=''; t.svcEnd=''; t.svcCreated=null; t.svcDone=false;
+        if(!t.log) t.log=[];
+        t.log.unshift({ id:uid(), when:now(), what:'Servis planı kaldırıldı (cihaz geçmişinden silindi).', auto:true });
+      }
+    }
+    if(f.faaliyetId){
+      db.maintenance=db.maintenance.filter(m=>m.id!==f.faaliyetId);
+    }
+  }
+  d.faults=d.faults.filter(x=>x.id!==fid);
+  saveDb(); renderDevices(); document.getElementById('exp-'+did)?.classList.add('open');
+  if(tab==='task') renderTasks();
+  if(tab==='bakim') renderBakim();
+}
+function cycleStatus(id){
+  const order=['faal','kisitli','dagilik']; const d=db.devices.find(x=>x.id===id);
+  d.status=order[(order.indexOf(d.status)+1)%3]; saveDb(); renderDevices();
+}
+
+function contractInfo(d){
+  if(d.contract!=='var'||!d.cend) return '';
+  const left=daysBetween(today(),d.cend);
+  if(left<0) return `<span class="expired">Anlaşma doldu (${d.cend})</span>`;
+  if(left<=30) return `<span class="warn">Anlaşma ${left} gün sonra doluyor (${d.cend})</span>`;
+  return `Anlaşma bitiş: ${d.cend}`;
+}
+function contractBadge(d){
+  if(d.contract!=='var'){
+    return `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span class="contract-badge cb-none" title="Bakım anlaşması yok">❌</span></div>`;
+  }
+  let icon;
+  if(d.coverage==='parcali') icon=`<span class="contract-badge" title="Parçalı bakım anlaşması">🤝🏼⚙️</span>`;
+  else if(d.coverage==='parcasiz') icon=`<span class="contract-badge" title="Parçasız bakım anlaşması">🤝🏼🪛</span>`;
+  else icon=`<span class="contract-badge" title="Bakım anlaşması var (kapsam türü belirtilmemiş)">🤝🏼</span>`;
+  let daysHtml='';
+  if(d.cend){
+    const left=daysBetween(today(),d.cend);
+    const cls = left>=180 ? 'cd-green' : left>=90 ? 'cd-amber' : 'cd-red';
+    const txt = left<0 ? `${-left}g geçti` : `${left}g`;
+    daysHtml=`<span class="contract-days ${cls}" title="Anlaşma bitiş: ${esc(d.cend)}">⏰ ${txt}</span>`;
+  }
+  return `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">${icon}${daysHtml}</div>`;
+}
+
+function renderDevices(){
+  const q=(document.getElementById('devSearch').value||'').toLowerCase();
+  const f=document.getElementById('devFilter').value;
+  const list=db.devices.filter(d=>{
+    if(f&&d.status!==f) return false;
+    if(!q) return true;
+    return [d.name,d.brand,d.model,d.serial,d.asset,d.sysno,d.dept,d.unit,d.loc].some(x=>(x||'').toLowerCase().includes(q));
+  });
+  const box=document.getElementById('devList');
+  if(!list.length){ box.innerHTML=`<div class="empty">${db.devices.length?'Eşleşen cihaz yok.':'Henüz cihaz yok. "+ Cihaz" ile ekle.'}</div>`; return; }
+  const sName={faal:'Faal',kisitli:'Kısıtlı',dagilik:'Kullanım dışı'};
+  box.innerHTML=list.map(d=>{
+    const faults=(d.faults||[]).map(f=>`<div class="fault"><span class="when" onclick="editFaultWhen('${d.id}','${f.id}')" title="Tarihi/saati düzenle">${esc(f.when)}</span><span class="what">${esc(f.what)}</span><button class="x" onclick="delFault('${d.id}','${f.id}')">×</button></div>`).join('') || '<div class="empty" style="padding:8px">Kayıtlı arıza yok.</div>';
+    const numsArr=devNumsArr(d);
+    const ci=contractInfo(d);
+    return `<div class="card">
+      <div class="dev-head">
+        <div class="dev-title">
+          <div class="name">${esc(d.name)}</div>
+          <div class="sub">${esc([d.brand,d.model].filter(Boolean).join(' · ')||'—')}</div>
+          ${(d.dept||d.unit||d.loc)?`<div class="sub" style="color:var(--dim)">${esc([d.dept,d.unit,d.loc].filter(Boolean).join(' › '))}</div>`:''}
+          <div class="dev-nums">${numsArr.join('   ')}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:0 0 auto">
+          <span class="status s-${d.status}" onclick="cycleStatus('${d.id}')" style="cursor:pointer">${sName[d.status]}</span>
+          ${contractBadge(d)}
+        </div>
+      </div>
+      ${ci?`<div class="contract">${ci}</div>`:''}
+      <div class="expand" id="exp-${d.id}">
+        <div class="sectlabel">Arıza / işlem geçmişi</div>
+        ${faults}
+        <div class="addfault"><input id="fi-${d.id}" placeholder="Ne oldu? (tarih-saat otomatik)" onkeydown="if(event.key==='Enter')addFault('${d.id}')"><button onclick="addFault('${d.id}')">Kaydet</button></div>
+        ${d.scope?`<div class="sectlabel" style="margin-top:12px">Anlaşma kapsamı</div><div style="font-size:13px;color:var(--muted)">${esc(d.scope)}${d.cstart?' · Başl: '+esc(d.cstart):''}</div>`:''}
+        ${d.note?`<div class="sectlabel" style="margin-top:12px">Şartname / not</div><div style="font-size:13px;color:var(--muted)">${esc(d.note)}</div>`:''}
+      </div>
+      <div class="rowbtns">
+        <button onclick="toggleExpand('${d.id}')">Geçmiş / detay</button>
+        <button onclick="openDeviceModal('${d.id}')">Düzenle</button>
+        <button onclick="quickTask('${d.id}')">İş aç</button>
+        <button onclick="quickBakim('${d.id}')">Bakım ekle</button>
+        <button class="danger" onclick="delDevice('${d.id}')">Sil</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- TASKS ---------- */
+
+/* ---- Aranabilir cihaz seçici (combo) — tk_device, sm_device, bk_device, histDeviceFilter için ortak ---- */
+function deviceComboLabel(d){ return d.name + (devPlace(d)?' — '+devPlace(d):''); }
+function deviceComboOptions(q){
+  const query=(q||'').trim().toLocaleLowerCase('tr');
+  return db.devices.filter(d=>{
+    if(!query) return true;
+    const hay=[d.name,d.brand,d.model,d.dept,d.unit,d.loc].filter(Boolean).join(' ').toLocaleLowerCase('tr');
+    return hay.includes(query);
+  }).sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+}
+function deviceComboSetVisual(qId,hidId,devId){
+  const q=document.getElementById(qId), h=document.getElementById(hidId);
+  if(!q||!h) return;
+  if(devId){ const d=db.devices.find(x=>x.id===devId); q.value = d?deviceComboLabel(d):''; }
+  else{ q.value=''; }
+  h.value = devId||'';
+}
+function deviceComboRenderList(qId,listId,emptyLabel){
+  const inp=document.getElementById(qId), list=document.getElementById(listId);
+  const items=deviceComboOptions(inp.value);
+  let html='';
+  if(emptyLabel!==null) html+=`<div class="combo-item" data-value="" style="color:var(--dim)">${esc(emptyLabel)}</div>`;
+  html+=items.map(d=>`<div class="combo-item" data-value="${d.id}">${esc(deviceComboLabel(d))}</div>`).join('');
+  if(!items.length && emptyLabel===null){ list.classList.remove('open'); list.innerHTML=''; return; }
+  list.innerHTML=html; list.classList.add('open');
+}
+function deviceComboInit(qId,listId,hidId,emptyLabel,onChange){
+  const inp=document.getElementById(qId), list=document.getElementById(listId);
+  if(!inp||!list) return;
+  inp.addEventListener('focus',()=>deviceComboRenderList(qId,listId,emptyLabel));
+  inp.addEventListener('input',()=>deviceComboRenderList(qId,listId,emptyLabel));
+  inp.addEventListener('blur',()=>setTimeout(()=>{
+    list.classList.remove('open');
+    deviceComboSetVisual(qId,hidId,document.getElementById(hidId).value||null);
+  },150));
+  list.addEventListener('mousedown',e=>{
+    const item=e.target.closest('.combo-item'); if(!item) return;
+    e.preventDefault();
+    const val=item.dataset.value||null;
+    deviceComboSetVisual(qId,hidId,val);
+    list.classList.remove('open');
+    if(onChange) onChange(val);
+  });
+}
+let deviceCombosInited=false;
+function deviceCombosInit(){
+  if(deviceCombosInited) return; deviceCombosInited=true;
+  deviceComboInit('tk_device_q','cl_tk_device','tk_device','— yok —');
+  deviceComboInit('sm_device_q','cl_sm_device','sm_device','— yok —');
+  deviceComboInit('bk_device_q','cl_bk_device','bk_device','— yok —');
+  deviceComboInit('histDeviceFilter_q','cl_histDeviceFilter','histDeviceFilter','Tüm cihazlar',()=>renderHistory());
+}
+
+/* ---- Aranabilir iş seçici (combo) — Faaliyet modalındaki Servis için ---- */
+function taskComboLabel(t){
+  const dev=t.device?db.devices.find(d=>d.id===t.device):null;
+  return t.title + (dev?' — '+dev.name:'');
+}
+function taskComboOptions(q){
+  const query=(q||'').trim().toLocaleLowerCase('tr');
+  return db.tasks.filter(t=>(t.type||'biyomedikal')==='biyomedikal').filter(t=>{
+    if(!query) return true;
+    const dev=t.device?db.devices.find(d=>d.id===t.device):null;
+    const hay=[t.title, t.note, dev?.name, dev?.brand, dev?.model, dev?.serial, dev?.asset, dev?.sysno, dev?.dept, dev?.unit, dev?.loc]
+      .filter(Boolean).join(' ').toLocaleLowerCase('tr');
+    return hay.includes(query);
+  }).sort((a,b)=>(a.done-b.done)||a.title.localeCompare(b.title,'tr'));
+}
+function taskComboSetVisual(qId,hidId,taskId){
+  const q=document.getElementById(qId), h=document.getElementById(hidId);
+  if(!q||!h) return;
+  if(taskId){ const t=db.tasks.find(x=>x.id===taskId); q.value = t?taskComboLabel(t):''; }
+  else{ q.value=''; }
+  h.value = taskId||'';
+}
+function taskComboRenderList(qId,listId){
+  const inp=document.getElementById(qId), list=document.getElementById(listId);
+  const items=taskComboOptions(inp.value);
+  if(!items.length){ list.classList.remove('open'); list.innerHTML=''; return; }
+  list.innerHTML=items.map(t=>`<div class="combo-item" data-value="${t.id}">${t.done?`<span style="color:var(--dim)">✓ Tamamlandı — ${esc(taskComboLabel(t))}</span>`:esc(taskComboLabel(t))}</div>`).join('');
+  list.classList.add('open');
+}
+function taskComboInit(qId,listId,hidId){
+  const inp=document.getElementById(qId), list=document.getElementById(listId);
+  if(!inp||!list) return;
+  inp.addEventListener('focus',()=>taskComboRenderList(qId,listId));
+  inp.addEventListener('input',()=>taskComboRenderList(qId,listId));
+  inp.addEventListener('blur',()=>setTimeout(()=>{
+    list.classList.remove('open');
+    taskComboSetVisual(qId,hidId,document.getElementById(hidId).value||null);
+  },150));
+  list.addEventListener('mousedown',e=>{
+    const item=e.target.closest('.combo-item'); if(!item) return;
+    e.preventDefault();
+    taskComboSetVisual(qId,hidId,item.dataset.value||null);
+    list.classList.remove('open');
+  });
+}
+let taskCombosInited=false;
+function taskCombosInit(){
+  if(taskCombosInited) return; taskCombosInited=true;
+  taskComboInit('bk_task_q','cl_bk_task','bk_task');
+}
+function openTaskModal(devId){
+  document.getElementById('taskModal').classList.add('open');
+  document.querySelector('#taskModal h3').textContent='Yeni iş';
+  document.getElementById('tk_id').value='';
+  document.getElementById('tk_title').value='';
+  document.getElementById('tk_note').value='';
+  document.getElementById('tk_due').value='';
+  document.getElementById('tk_prio').value='orta';
+  document.getElementById('tk_duration').value='oturum';
+  document.getElementById('tk_type').value = devId ? 'biyomedikal' : mode;
+  document.getElementById('tk_repeat').value='tek';
+  document.getElementById('tk_monthdays').value='';
+  document.querySelectorAll('#tk_weekdays input').forEach(c=>c.checked=false);
+  deviceComboSetVisual('tk_device_q','tk_device',devId||null);
+  document.getElementById('tk_svcdate').value='';
+  document.getElementById('tk_svcstart').value='';
+  document.getElementById('tk_svcend').value='';
+  document.getElementById('tk_notify').value='';
+  toggleRepeatFields(); toggleDeviceField();
+}
+function editTask(id){
+  const t=db.tasks.find(x=>x.id===id);
+  document.getElementById('taskModal').classList.add('open');
+  document.querySelector('#taskModal h3').textContent='İşi düzenle';
+  document.getElementById('tk_id').value=id;
+  document.getElementById('tk_title').value=t.title||'';
+  document.getElementById('tk_note').value=t.note||'';
+  document.getElementById('tk_due').value=t.due||'';
+  document.getElementById('tk_prio').value=t.prio||'orta';
+  document.getElementById('tk_duration').value=t.duration||'oturum';
+  document.getElementById('tk_type').value=t.type||'biyomedikal';
+  document.getElementById('tk_repeat').value=t.repeat||'tek';
+  document.getElementById('tk_monthdays').value=(t.monthdays||[]).join(', ');
+  document.querySelectorAll('#tk_weekdays input').forEach(c=>c.checked=(t.weekdays||[]).includes(+c.value));
+  document.getElementById('tk_afterdays').value=t.afterdays||7;
+  deviceComboSetVisual('tk_device_q','tk_device',t.device||null);
+  document.getElementById('tk_svcdate').value=t.svcDate||'';
+  document.getElementById('tk_svcstart').value=t.svcStart||'';
+  document.getElementById('tk_svcend').value=t.svcEnd||'';
+  document.getElementById('tk_notify').value=t.notifyDate||'';
+  toggleRepeatFields(); toggleDeviceField();
+}
+function toggleDeviceField(){
+  const show = document.getElementById('tk_type').value!=='kisisel';
+  document.getElementById('tk_deviceWrap').style.display = show?'block':'none';
+  document.getElementById('tk_svcWrap').style.display = show?'block':'none';
+  document.getElementById('tk_notifyWrap').style.display = show?'block':'none';
+}
+function toggleRepeatFields(){
+  const v=document.getElementById('tk_repeat').value;
+  document.getElementById('rp_weekly').style.display = v==='haftalik'?'block':'none';
+  document.getElementById('rp_monthly').style.display = v==='aylik'?'block':'none';
+  document.getElementById('rp_after').style.display = v==='sonra'?'block':'none';
+}
+function quickTask(devId){ switchTab('task'); openTaskModal(devId); }
+function saveTask(){
+  const title=document.getElementById('tk_title').value.trim();
+  if(!title){ toast('İş adı gerekli'); return; }
+  const repeat=document.getElementById('tk_repeat').value;
+  const weekdays=[...document.querySelectorAll('#tk_weekdays input:checked')].map(c=>+c.value);
+  const monthdays=(document.getElementById('tk_monthdays').value||'').split(',').map(x=>parseInt(x.trim())).filter(n=>n>=1&&n<=31);
+  const id=document.getElementById('tk_id').value;
+  const type=document.getElementById('tk_type').value;
+  const fields={ title, type,
+    device: type==='kisisel' ? null : (document.getElementById('tk_device').value||null),
+    prio:document.getElementById('tk_prio').value, duration:document.getElementById('tk_duration').value||'oturum',
+    due:document.getElementById('tk_due').value||null,
+    note:document.getElementById('tk_note').value.trim(),
+    repeat, weekdays, monthdays, afterdays:document.getElementById('tk_afterdays').value,
+    svcDate: type==='kisisel' ? null : (document.getElementById('tk_svcdate').value||null),
+    svcStart: type==='kisisel' ? '' : (document.getElementById('tk_svcstart').value||''),
+    svcEnd: type==='kisisel' ? '' : (document.getElementById('tk_svcend').value||''),
+    notifyDate: type==='kisisel' ? null : (document.getElementById('tk_notify').value||null) };
+
+  if(id){
+    const t=db.tasks.find(x=>x.id===id);
+    if(!t.log) t.log=[];
+    const pName={yuksek:'Yüksek',orta:'Orta',dusuk:'Düşük'};
+    const devName=v=>{ const d=v?db.devices.find(x=>x.id===v):null; return d?d.name:'yok'; };
+    const changes=[];
+    if(t.title!==fields.title) changes.push(`başlık "${fields.title}" olarak güncellendi`);
+    if((t.due||'')!==(fields.due||'')) changes.push(`son tarih ${fields.due?fields.due+' olarak güncellendi':'kaldırıldı'}`);
+    if((t.notifyDate||'')!==(fields.notifyDate||'')) changes.push(`bildirim tarihi ${fields.notifyDate?fields.notifyDate+' olarak güncellendi':'kaldırıldı'}`);
+    if(t.prio!==fields.prio) changes.push(`öncelik ${pName[fields.prio]} olarak güncellendi`);
+    if((t.duration||'oturum')!==fields.duration) changes.push(`süre ${DUR_LABEL[fields.duration]} olarak güncellendi`);
+    if((t.device||'')!==(fields.device||'')) changes.push(`bağlı cihaz ${devName(fields.device)} olarak güncellendi`);
+    if((t.note||'')!==(fields.note||'')) changes.push(`not güncellendi`);
+    if(t.repeat!==fields.repeat) changes.push(`tekrar ayarı güncellendi`);
+    const svcDateChanged=(t.svcDate||'')!==(fields.svcDate||'');
+    const svcTimeChanged=fields.svcDate && ((t.svcStart||'')!==(fields.svcStart||'') || (t.svcEnd||'')!==(fields.svcEnd||''));
+    if(svcDateChanged || svcTimeChanged) changes.push(fields.svcDate ? `${fields.svcDate} tarihine ${fields.svcStart||'belirtilmeyen'} saatinde servis planlandı` : `servis planı kaldırıldı`);
+    const wasSvcSet=!!t.svcDate;
+    Object.assign(t, fields);
+    if(!wasSvcSet && t.svcDate) t.svcCreated=now(); // plan ilk kez burada oluşturuldu
+    else if(!t.svcDate) { t.svcCreated=null; t.svcDone=false; } // plan kaldırıldı
+    if(svcDateChanged || svcTimeChanged) t.svcDone=false; // yeni/yeniden planlanan servis tekrar açık sayılır
+    changes.forEach(c=>{
+      const entry={ id:uid(), when:now(), what:c.charAt(0).toUpperCase()+c.slice(1)+'.', auto:true };
+      t.log.unshift(entry);
+      syncLogEntryToDevice(t, entry);
+    });
+    syncServisDeviceFault(t);
+    saveDb(); closeModal('taskModal'); renderTasks(); document.getElementById('texp-'+id)?.classList.add('open');
+    if(tab==='bakim') renderBakim();
+    toast('İş güncellendi');
+  } else {
+    const t={ id:uid(), ...fields, done:false, svcDone:false, created:today(), createdTime:nowTime(), closed:null, closedTime:null, subtasks:[], log:[] };
+    if(t.svcDate) t.svcCreated=now();
+    db.tasks.unshift(t);
+    syncServisDeviceFault(t);
+    saveDb(); closeModal('taskModal'); renderTasks(); toast('İş eklendi');
+    if(tab==='bakim') renderBakim();
+  }
+}
+function nextDate(t){
+  const base=new Date(today()+'T12:00:00');
+  if(t.repeat==='haftalik' && t.weekdays && t.weekdays.length){
+    for(let i=1;i<=7;i++){ const d=new Date(base); d.setDate(d.getDate()+i); if(t.weekdays.includes(d.getDay())) return d.toISOString().slice(0,10); }
+  } else if(t.repeat==='aylik' && t.monthdays && t.monthdays.length){
+    let best=null;
+    for(let m=0;m<=1;m++){ t.monthdays.forEach(day=>{
+      const d=new Date(base.getFullYear(), base.getMonth()+m, Math.min(day,28), 12);
+      if(d>base && (!best||d<best)) best=d;
+    }); if(best) break; }
+    return best?best.toISOString().slice(0,10):null;
+  } else if(t.repeat==='sonra'){
+    const d=new Date(base); d.setDate(d.getDate()+(+t.afterdays||7)); return d.toISOString().slice(0,10);
+  }
+  return null;
+}
+function toggleTask(id){
+  const t=db.tasks.find(x=>x.id===id);
+  if(!t.done && t.repeat && t.repeat!=='tek'){
+    // tekrarlayan iş: bu turu kapat, yeni turu aç
+    const nd=nextDate(t);
+    t.done=true; t.closed=today(); t.closedTime=nowTime();
+    if(nd){
+      const fresh={ ...t, id:uid(), done:false, closed:null, closedTime:null, created:nd, createdTime:null, due:nd, log:[],
+        svcDate:null, svcStart:'', svcEnd:'', svcCreated:null, svcDone:false,
+        subtasks:(t.subtasks||[]).map(s=>({ ...s, id:uid(), done:false, closed:null })) };
+      db.tasks.unshift(fresh);
+      toast('Tekrar bir sonraki tarihe taşındı: '+nd);
+    } else {
+      toast('Tekrar için gün seçilmemiş — tek sefer kapatıldı');
+    }
+  } else {
+    t.done=!t.done; t.closed=t.done?today():null; t.closedTime=t.done?nowTime():null;
+  }
+  syncServisDeviceFault(t);
+  saveDb(); renderTasks();
+  if(tab==='bakim') renderBakim();
+}
+function delTask(id){
+  if(!confirm('İş silinsin mi?'))return;
+  db.devices.forEach(d=>{ if(d.faults) d.faults=d.faults.filter(f=>f.servisTaskId!==id); });
+  db.tasks=db.tasks.filter(x=>x.id!==id);
+  saveDb(); renderTasks();
+  if(tab==='bakim') renderBakim();
+}
+function toggleTaskExpand(id){ document.getElementById('texp-'+id).classList.toggle('open'); }
+function editTaskCreated(id){
+  const t=db.tasks.find(x=>x.id===id); if(!t) return;
+  const cur=t.created+(t.createdTime?' '+t.createdTime:'');
+  const v=prompt('Açılış tarihi/saati (YYYY-AA-GG SS:DD):', cur);
+  if(v===null) return;
+  const p=parseDateTimeInput(v);
+  if(!p){ toast('Geçersiz biçim — YYYY-AA-GG SS:DD kullan'); return; }
+  t.created=p.date; t.createdTime=p.time||'';
+  saveDb(); renderTasks(); document.getElementById('texp-'+id)?.classList.add('open');
+  if(tab==='hist') renderHistory();
+}
+function editTaskClosed(id){
+  const t=db.tasks.find(x=>x.id===id); if(!t || !t.done) return;
+  const cur=(t.closed||'')+(t.closedTime?' '+t.closedTime:'');
+  const v=prompt('Bitiş tarihi/saati (YYYY-AA-GG SS:DD):', cur);
+  if(v===null) return;
+  const p=parseDateTimeInput(v);
+  if(!p){ toast('Geçersiz biçim — YYYY-AA-GG SS:DD kullan'); return; }
+  t.closed=p.date; t.closedTime=p.time||'';
+  saveDb(); renderTasks(); document.getElementById('texp-'+id)?.classList.add('open');
+  if(tab==='hist') renderHistory();
+}
+
+function backfillTaskLogsToDevices(){
+  let count=0;
+  const touched=new Set();
+  db.tasks.forEach(t=>{
+    if(!t.device || !t.log || !t.log.length) return;
+    const dev=db.devices.find(d=>d.id===t.device); if(!dev) return;
+    if(!dev.faults) dev.faults=[];
+    t.log.forEach(l=>{
+      const exists=dev.faults.some(f=>f.id===l.id && f.fromTask===t.id);
+      if(!exists){
+        dev.faults.push({ id:l.id, when:l.when, what:`[İş: ${t.title}] ${l.what}`, fromTask:t.id });
+        count++; touched.add(dev.id);
+      }
+    });
+  });
+  touched.forEach(id=>{
+    const dev=db.devices.find(d=>d.id===id);
+    dev.faults.sort((a,b)=>b.when.localeCompare(a.when)); // kronolojik sırayı koru
+  });
+  if(count){ saveDb(); renderDevices(); toast(`${count} geçmiş kayıt cihazlara aktarıldı`); }
+  else{ toast('Aktarılacak yeni kayıt bulunamadı'); }
+}
+function syncLogEntryToDevice(t, entry){
+  if(!t.device) return;
+  const dev=db.devices.find(d=>d.id===t.device); if(!dev) return;
+  if(!dev.faults) dev.faults=[];
+  if(dev.faults.some(f=>f.id===entry.id && f.fromTask===t.id)) return;
+  dev.faults.unshift({ id:entry.id, when:entry.when, what:`[İş: ${t.title}] ${entry.what}`, fromTask:t.id });
+}
+function addLog(tid){
+  const inp=document.getElementById('lgi-'+tid); const v=inp.value.trim(); if(!v) return;
+  const t=db.tasks.find(x=>x.id===tid); if(!t.log) t.log=[];
+  const entry={ id:uid(), when:now(), what:v };
+  t.log.unshift(entry);
+  syncLogEntryToDevice(t, entry);
+  inp.value=''; saveDb(); renderTasks(); document.getElementById('texp-'+tid)?.classList.add('open');
+  document.getElementById('lgi-'+tid)?.focus();
+}
+function editLogWhen(tid,lid){
+  const t=db.tasks.find(x=>x.id===tid); if(!t) return;
+  const l=(t.log||[]).find(x=>x.id===lid); if(!l) return;
+  const v=prompt('Tarih/saat (YYYY-AA-GG SS:DD):', l.when);
+  if(v===null) return;
+  const p=parseDateTimeInput(v);
+  if(!p){ toast('Geçersiz biçim — YYYY-AA-GG SS:DD kullan'); return; }
+  l.when = p.time ? p.date+' '+p.time : p.date;
+  if(t.device){
+    const dev=db.devices.find(d=>d.id===t.device);
+    const f=dev&&dev.faults?dev.faults.find(x=>x.id===lid && x.fromTask===tid):null;
+    if(f) f.when=l.when;
+  }
+  saveDb(); renderTasks(); document.getElementById('texp-'+tid)?.classList.add('open');
+  if(tab==='hist') renderHistory();
+}
+function delLog(tid,lid){
+  const t=db.tasks.find(x=>x.id===tid); t.log=t.log.filter(l=>l.id!==lid);
+  if(t.device){
+    const dev=db.devices.find(d=>d.id===t.device);
+    if(dev&&dev.faults) dev.faults=dev.faults.filter(f=>!(f.id===lid && f.fromTask===tid));
+  }
+  saveDb(); renderTasks(); document.getElementById('texp-'+tid)?.classList.add('open');
+}
+
+function addSub(tid){
+  const inp=document.getElementById('sti-'+tid); const v=inp.value.trim(); if(!v) return;
+  const t=db.tasks.find(x=>x.id===tid); if(!t.subtasks) t.subtasks=[];
+  t.subtasks.push({ id:uid(), text:v, done:false, prio:t.prio||'orta', duration:'oturum', device:null, due:null, repeat:'tek', created:today(), closed:null });
+  if(!t.log) t.log=[];
+  const entry={ id:uid(), when:now(), what:`"${v}" alt görevi eklendi.`, auto:true };
+  t.log.unshift(entry);
+  syncLogEntryToDevice(t, entry);
+  inp.value=''; saveDb(); renderTasks(); document.getElementById('texp-'+tid)?.classList.add('open');
+  document.getElementById('sti-'+tid)?.focus();
+}
+function toggleSub(tid,sid){
+  const t=db.tasks.find(x=>x.id===tid); const s=t.subtasks.find(x=>x.id===sid);
+  s.done=!s.done; s.closed=s.done?today():null;
+  if(!t.log) t.log=[];
+  const entry={ id:uid(), when:now(), what:`"${s.text}" alt görevi ${s.done?'tamamlandı':'yeniden açıldı'}.`, auto:true };
+  t.log.unshift(entry);
+  syncLogEntryToDevice(t, entry);
+  saveDb(); renderTasks(); document.getElementById('texp-'+tid)?.classList.add('open');
+}
+function delSub(tid,sid){ const t=db.tasks.find(x=>x.id===tid); t.subtasks=t.subtasks.filter(x=>x.id!==sid); saveDb(); renderTasks(); document.getElementById('texp-'+tid)?.classList.add('open'); }
+
+let subCtx=null;
+let subEditId=null;
+function openSubModal(tid){
+  subCtx=tid; subEditId=null;
+  document.getElementById('subModal').classList.add('open');
+  document.querySelector('#subModal h3').textContent='Alt görev';
+  document.getElementById('sm_text').value='';
+  document.getElementById('sm_prio').value='orta';
+  document.getElementById('sm_duration').value='oturum';
+  document.getElementById('sm_due').value='';
+  document.getElementById('sm_repeat').value='tek';
+  document.getElementById('sm_monthdays').value='';
+  document.querySelectorAll('#sm_weekdays input').forEach(c=>c.checked=false);
+  deviceComboSetVisual('sm_device_q','sm_device',null);
+  smToggleRepeat();
+}
+function editSub(tid,sid){
+  subCtx=tid; subEditId=sid;
+  const s=db.tasks.find(x=>x.id===tid).subtasks.find(x=>x.id===sid);
+  document.getElementById('subModal').classList.add('open');
+  document.querySelector('#subModal h3').textContent='Alt görevi düzenle';
+  document.getElementById('sm_text').value=s.text||'';
+  document.getElementById('sm_prio').value=s.prio||'orta';
+  document.getElementById('sm_duration').value=s.duration||'oturum';
+  document.getElementById('sm_due').value=s.due||'';
+  document.getElementById('sm_repeat').value=s.repeat||'tek';
+  document.getElementById('sm_monthdays').value=(s.monthdays||[]).join(', ');
+  deviceComboSetVisual('sm_device_q','sm_device',s.device||null);
+  document.querySelectorAll('#sm_weekdays input').forEach(c=>c.checked=(s.weekdays||[]).includes(+c.value));
+  document.getElementById('sm_afterdays').value=s.afterdays||7;
+  smToggleRepeat();
+}
+function smToggleRepeat(){
+  const v=document.getElementById('sm_repeat').value;
+  document.getElementById('sm_weekly').style.display=v==='haftalik'?'block':'none';
+  document.getElementById('sm_monthly').style.display=v==='aylik'?'block':'none';
+  document.getElementById('sm_afterwrap').style.display=v==='sonra'?'block':'none';
+}
+function saveSub(){
+  const text=document.getElementById('sm_text').value.trim();
+  if(!text){ toast('Alt görev metni gerekli'); return; }
+  const t=db.tasks.find(x=>x.id===subCtx); if(!t.subtasks) t.subtasks=[];
+  const weekdays=[...document.querySelectorAll('#sm_weekdays input:checked')].map(c=>+c.value);
+  const monthdays=(document.getElementById('sm_monthdays').value||'').split(',').map(x=>parseInt(x.trim())).filter(n=>n>=1&&n<=31);
+  const fields={ text, prio:document.getElementById('sm_prio').value,
+    duration:document.getElementById('sm_duration').value||'oturum',
+    device:document.getElementById('sm_device').value||null, due:document.getElementById('sm_due').value||null,
+    repeat:document.getElementById('sm_repeat').value, weekdays, monthdays,
+    afterdays:document.getElementById('sm_afterdays').value };
+  if(subEditId){
+    const s=t.subtasks.find(x=>x.id===subEditId);
+    const oldText=s.text;
+    Object.assign(s,fields);
+    if(oldText!==text && t.log){
+      const entry=t.log.find(l=>l.auto && l.what===`"${oldText}" alt görevi eklendi.`);
+      if(entry){
+        entry.what=`"${text}" alt görevi eklendi.`;
+        if(t.device){
+          const dev=db.devices.find(d=>d.id===t.device);
+          const f=dev&&dev.faults?dev.faults.find(x=>x.id===entry.id && x.fromTask===t.id):null;
+          if(f) f.what=`[İş: ${t.title}] ${entry.what}`;
+        }
+      }
+    }
+  }
+  else {
+    t.subtasks.push({ id:uid(), done:false, created:today(), closed:null, ...fields });
+    if(!t.log) t.log=[];
+    const entry={ id:uid(), when:now(), what:`"${text}" alt görevi eklendi.`, auto:true };
+    t.log.unshift(entry);
+    syncLogEntryToDevice(t, entry);
+  }
+  saveDb(); closeModal('subModal'); renderTasks(); document.getElementById('texp-'+subCtx)?.classList.add('open');
+  toast(subEditId?'Alt görev güncellendi':'Alt görev eklendi');
+}
+
+/* ---- Alt görev sürükle-bırak sıralama (dokunmatik + fare, Pointer Events) ---- */
+let subDragCtx=null, subDragMoved=false;
+function subDragStart(e){
+  const handle=e.target.closest('[data-drag-handle]'); if(!handle) return;
+  const row=handle.closest('.subrow'); if(!row) return;
+  const container=row.closest('.subs'); if(!container) return;
+  if(container.querySelectorAll('.subrow').length<2) return;
+  e.preventDefault();
+  subDragMoved=false;
+  subDragCtx={ taskId:container.dataset.taskId, container, row, startY:e.clientY };
+  row.classList.add('dragging');
+  row.style.position='relative';
+  row.style.zIndex='5';
+  document.addEventListener('pointermove', subDragMove);
+  document.addEventListener('pointerup', subDragEnd);
+  document.addEventListener('pointercancel', subDragEnd);
+}
+function subDragMove(e){
+  if(!subDragCtx) return;
+  subDragMoved=true;
+  e.preventDefault();
+  const {row}=subDragCtx;
+  row.style.transform=`translateY(${e.clientY-subDragCtx.startY}px)`;
+  let guard=0;
+  while(subDragTrySwap(e.clientY) && guard++<50){}
+}
+function subDragTrySwap(clientY){
+  // sürüklenen satır bir komşusunun ortasını geçtiyse DOM'da yer değiştir, sonra
+  // görsel konumu (transform) sıçramadan devam edecek şekilde yeni baz noktayı hesapla
+  const {row,container}=subDragCtx;
+  const rows=[...container.querySelectorAll('.subrow')];
+  const idx=rows.indexOf(row);
+  const rowRect=row.getBoundingClientRect();
+  const rowMid=rowRect.top+rowRect.height/2;
+  let target=null, placeBefore=null;
+  const next=rows[idx+1];
+  if(next){ const r=next.getBoundingClientRect(); if(rowMid>r.top+r.height/2){ target=next; placeBefore=false; } }
+  if(!target){
+    const prev=rows[idx-1];
+    if(prev){ const r=prev.getBoundingClientRect(); if(rowMid<r.top+r.height/2){ target=prev; placeBefore=true; } }
+  }
+  if(!target) return false;
+  if(placeBefore) container.insertBefore(row, target);
+  else container.insertBefore(target, row);
+  row.style.transform='none';
+  const newTop=row.getBoundingClientRect().top;
+  const newDy=rowRect.top-newTop;
+  row.style.transform=`translateY(${newDy}px)`;
+  subDragCtx.startY=clientY-newDy;
+  return true;
+}
+function subDragSuppressClick(ev){ ev.stopPropagation(); ev.preventDefault(); }
+function subDragEnd(e){
+  if(!subDragCtx) return;
+  const {row,container,taskId}=subDragCtx;
+  const moved=subDragMoved;
+  row.classList.remove('dragging');
+  row.style.transform=''; row.style.position=''; row.style.zIndex='';
+  document.removeEventListener('pointermove', subDragMove);
+  document.removeEventListener('pointerup', subDragEnd);
+  document.removeEventListener('pointercancel', subDragEnd);
+  subDragCtx=null;
+  if(moved){
+    // Sürükleme parmağı/imleci başka bir satırın üzerinde bıraktıysa, o satırın
+    // checkbox/buton tıklamasını tetiklememesi için bir sonraki click'i yut
+    document.addEventListener('click', subDragSuppressClick, {capture:true, once:true});
+    setTimeout(()=>document.removeEventListener('click', subDragSuppressClick, {capture:true}), 400);
+  }
+  const order=[...container.querySelectorAll('.subrow')].map(r=>r.dataset.subId);
+  const t=db.tasks.find(x=>x.id===taskId);
+  if(t && Array.isArray(t.subtasks) && t.subtasks.length){
+    const changed = order.some((id,i)=> t.subtasks[i] && id!==t.subtasks[i].id);
+    if(changed){
+      const map=new Map(t.subtasks.map(s=>[s.id,s]));
+      const reordered=order.map(id=>map.get(id)).filter(Boolean);
+      t.subtasks.forEach(s=>{ if(!order.includes(s.id)) reordered.push(s); }); // güvenlik: eşleşmeyen kalırsa kaybolmasın
+      t.subtasks=reordered;
+      saveDb();
+    }
+  }
+  renderTasks();
+  document.getElementById('texp-'+taskId)?.classList.add('open');
+}
+function initSubDrag(){
+  const box=document.getElementById('taskList'); if(!box) return;
+  box.addEventListener('pointerdown', subDragStart);
+}
+
+function editLog(tid,lid){
+  const t=db.tasks.find(x=>x.id===tid); const l=t.log.find(x=>x.id===lid);
+  const v=prompt('Gelişme kaydını düzenle:', l.what);
+  if(v===null) return;
+  const nv=v.trim(); if(!nv){ toast('Boş bırakılamaz'); return; }
+  l.what=nv;
+  if(t.device){
+    const dev=db.devices.find(d=>d.id===t.device);
+    const f=dev&&dev.faults?dev.faults.find(x=>x.id===lid && x.fromTask===tid):null;
+    if(f) f.what=`[İş: ${t.title}] ${nv}`;
+  }
+  saveDb(); renderTasks(); document.getElementById('texp-'+tid)?.classList.add('open');
+}
+
+function renderTasks(){
+  const q=(document.getElementById('taskSearch').value||'').toLowerCase();
+  const f=document.getElementById('taskFilter').value;
+  let list=db.tasks.filter(t=>{
+    if(f==='acik'&&t.done) return false;
+    if(f==='bitti'&&!t.done) return false;
+    if((t.type||'biyomedikal')!==mode) return false;
+    if(q){
+      const dev=t.device?db.devices.find(d=>d.id===t.device):null;
+      const hay=[t.title, t.note, dev?.name, dev?.brand, dev?.model, dev?.dept, dev?.unit, dev?.loc, dev?.serial, dev?.asset, dev?.sysno]
+        .filter(Boolean).join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const box=document.getElementById('taskList');
+  if(!list.length){ box.innerHTML=`<div class="empty">${db.tasks.length?'Eşleşen iş yok.':'Henüz iş yok.'}</div>`; return; }
+  const pName={yuksek:'Yüksek',orta:'Orta',dusuk:'Düşük'};
+  box.innerHTML=list.map(t=>{
+    const dev=t.device?db.devices.find(d=>d.id===t.device):null;
+    const age=daysBetween(t.created, today());
+    const dueWarn = t.due && !t.done && daysBetween(today(),t.due)<=3;
+    const rpName={haftalik:'↻ haftalık',aylik:'↻ aylık',sonra:'↻ tekrar'};
+    const typeBadge = (t.type||'biyomedikal')==='kisisel'?'<span class="prio p-dusuk">Kişisel</span>':'<span class="prio p-dusuk" style="color:var(--blue)">Biyomedikal</span>';
+    const subs=(t.subtasks||[]);
+    const subDone=subs.filter(s=>s.done).length;
+    const subList=subs.map(s=>{
+      const sdev=s.device?db.devices.find(d=>d.id===s.device):null;
+      const dragHandle = subs.length>1 ? `<span class="drag-handle" data-drag-handle title="Sürükle, sırayı değiştir">⠿</span>` : '';
+      return `<div class="subrow" data-sub-id="${s.id}">
+        ${dragHandle}
+        <input type="checkbox" ${s.done?'checked':''} onchange="toggleSub('${t.id}','${s.id}')">
+        <div class="txt ${s.done?'done':''}">${esc(s.text)}${s.prio&&s.prio!=='orta'?` <span class="prio p-${s.prio}" style="font-size:9px">${s.prio}</span>`:''} <span class="tag-mini d">${DUR_SHORT[s.duration||'oturum']}</span>${sdev?` <span style="color:var(--blue);font-size:11px">↳${esc(sdev.name)}</span>`:''}${s.due?` <span style="color:var(--dim);font-size:11px">${esc(s.due)}</span>`:''}</div>
+        <button class="edit" onclick="editSub('${t.id}','${s.id}')">düzenle</button>
+        <button class="del" onclick="delSub('${t.id}','${s.id}')">×</button>
+      </div>`;
+    }).join('');
+    const logList=(t.log||[]).map(l=>`<div class="fault"${l.auto?' style="opacity:.72"':''}><span class="when" onclick="editLogWhen('${t.id}','${l.id}')" title="Tarihi/saati düzenle">${esc(l.when)}</span><span class="what"${l.auto?' style="font-style:italic"':''}>${esc(l.what)}</span>${l.auto?'':`<button class="edit" onclick="editLog('${t.id}','${l.id}')" style="border:none;background:none;color:var(--muted);font-size:11px;cursor:pointer;padding:2px 6px">düzenle</button>`}<button class="x" onclick="delLog('${t.id}','${l.id}')">×</button></div>`).join('')||'<div class="empty" style="padding:8px">Henüz kayıt yok.</div>';
+    return `<div class="card task">
+      <div class="dev-head">
+        <div class="dev-title">
+          <div class="t-name ${t.done?'done':''}">${esc(t.title)}</div>
+          ${dev?`<div class="t-link" onclick="goToDeviceCard('${dev.id}')" title="Cihaz kartına git">↳ ${esc(dev.name)}${[dev.brand,dev.model].filter(Boolean).join(' ')?' · '+esc([dev.brand,dev.model].filter(Boolean).join(' ')):''}${devPlace(dev)?' · '+esc(devPlace(dev)):''}${devNumsArr(dev).length?' · '+devNumsArr(dev).join('  '):''}</div>`:''}
+          ${t.svcDate?`<div style="margin-top:4px"><span class="tag-mini" style="background:var(--surface2);color:${t.svcDone?'var(--dim)':'var(--blue)'};cursor:pointer${t.svcDone?';text-decoration:line-through':''}" onclick="quickServis('${t.id}')">🔧 ${t.svcDone?'Servis tamamlandı':'Servis planlandı'}: ${esc(t.svcDate)}${t.svcStart?' '+esc(t.svcStart):''}${t.svcEnd?'–'+esc(t.svcEnd):''}</span></div>`:''}
+          <div class="t-meta"><span class="when-edit" onclick="editTaskCreated('${t.id}')" title="Açılış tarihini/saatini düzenle">Açılış ${esc(t.created)}${t.createdTime?' '+esc(t.createdTime):''}</span>${t.notifyDate?' · bildirim '+esc(t.notifyDate):''}${t.done?` · <span class="when-edit" onclick="editTaskClosed('${t.id}')" title="Bitiş tarihini/saatini düzenle">Bitiş ${esc(t.closed)}${t.closedTime?' '+esc(t.closedTime):''}</span>`:' · '+age+' gündür açık'}${t.due?(dueWarn?' · ⚠ son tarih '+esc(t.due):' · son tarih '+esc(t.due)):''}${t.repeat&&t.repeat!=='tek'?' · '+rpName[t.repeat]:''}${subs.length?' · alt görev '+subDone+'/'+subs.length:''} · ${DUR_LABEL[t.duration||'oturum']}</div>
+          ${t.note?`<div style="font-size:12.5px;color:var(--muted);margin-top:5px">${esc(t.note)}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span class="prio p-${t.prio}">${pName[t.prio]}</span></div>
+      </div>
+      <div class="expand" id="texp-${t.id}">
+        <div class="sectlabel">Alt görevler</div>
+        <div class="subs" id="subs-${t.id}" data-task-id="${t.id}">${subList||'<div class="empty" style="padding:6px">Alt görev yok.</div>'}</div>
+        <div class="addfault"><input id="sti-${t.id}" placeholder="Alt görev ekle" onkeydown="if(event.key==='Enter')addSub('${t.id}')"><button onclick="openSubModal('${t.id}')">Detaylı +</button><button onclick="addSub('${t.id}')">+</button></div>
+        <div class="sectlabel" style="margin-top:13px">Gelişme günlüğü</div>
+        ${logList}
+        <div class="addfault"><input id="lgi-${t.id}" placeholder="Gelişme / not ekle (tarih-saat otomatik)" onkeydown="if(event.key==='Enter')addLog('${t.id}')"><button onclick="addLog('${t.id}')">Kaydet</button></div>
+      </div>
+      <div class="rowbtns">
+        <button onclick="toggleTaskExpand('${t.id}')">Detay / günlük</button>
+        <button onclick="editTask('${t.id}')">Düzenle</button>
+        ${(t.type||'biyomedikal')==='biyomedikal'?`<button onclick="quickServis('${t.id}')">Servis ekle</button>`:''}
+        <button onclick="toggleTask('${t.id}')">${t.done?'Geri aç':'Tamamlandı'}</button>
+        <button class="danger" onclick="delTask('${t.id}')">Sil</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- ALIŞVERİŞ LİSTESİ ---------- */
+function addShoppingCat(){
+  const name=(prompt('Yeni kategori adı:')||'').trim();
+  if(!name) return;
+  if(db.shoppingCats.some(c=>c.name.toLocaleLowerCase('tr')===name.toLocaleLowerCase('tr'))){ toast('Bu kategori zaten var'); return; }
+  db.shoppingCats.push({ id:uid(), name });
+  saveDb(); renderListe(); toast('Kategori eklendi');
+}
+function delShoppingCat(id){
+  const cat=db.shoppingCats.find(c=>c.id===id); if(!cat) return;
+  const count=db.shopping.filter(x=>x.catId===id).length;
+  if(!confirm(count?`"${cat.name}" kategorisi ve içindeki ${count} madde silinsin mi?`:`"${cat.name}" kategorisi silinsin mi?`)) return;
+  db.shoppingCats=db.shoppingCats.filter(c=>c.id!==id);
+  db.shopping=db.shopping.filter(x=>x.catId!==id);
+  saveDb(); renderListe();
+}
+function editShoppingCat(id){
+  const cat=db.shoppingCats.find(c=>c.id===id); if(!cat) return;
+  const v=prompt('Kategori adını düzenle:', cat.name);
+  if(v===null) return;
+  const name=v.trim(); if(!name){ toast('Boş bırakılamaz'); return; }
+  if(db.shoppingCats.some(c=>c.id!==id && c.name.toLocaleLowerCase('tr')===name.toLocaleLowerCase('tr'))){ toast('Bu isimde kategori zaten var'); return; }
+  cat.name=name; saveDb(); renderListe();
+}
+function editShoppingItem(id){
+  const it=db.shopping.find(x=>x.id===id); if(!it) return;
+  const v=prompt('Maddeyi düzenle:', it.text);
+  if(v===null) return;
+  const text=v.trim(); if(!text){ toast('Boş bırakılamaz'); return; }
+  it.text=text; saveDb(); renderListe();
+}
+function addShoppingItem(catId){
+  const inp=document.getElementById('sci-'+catId); const v=inp.value.trim(); if(!v) return;
+  db.shopping.unshift({ id:uid(), text:v, catId, done:false, created:today() });
+  saveDb(); renderListe();
+  const again=document.getElementById('sci-'+catId); if(again) again.focus();
+}
+function toggleShoppingItem(id){
+  const it=db.shopping.find(x=>x.id===id); it.done=!it.done;
+  saveDb(); renderListe();
+}
+function delShoppingItem(id){
+  db.shopping=db.shopping.filter(x=>x.id!==id); saveDb(); renderListe();
+}
+function clearBought(){
+  const n=db.shopping.filter(x=>x.done).length; if(!n) return;
+  db.shopping=db.shopping.filter(x=>!x.done);
+  saveDb(); renderListe(); toast('Alınanlar temizlendi');
+}
+function renderListe(){
+  const box=document.getElementById('view-liste'); if(!box) return;
+  const openCount=db.shopping.filter(x=>!x.done).length;
+  const doneCount=db.shopping.filter(x=>x.done).length;
+  let html=`<div class="bar">
+    <div style="flex:1;font-size:13px;color:var(--muted)">${openCount} madde bekliyor${doneCount?' · '+doneCount+' alındı':''}</div>
+    <button class="addbtn" onclick="addShoppingCat()">+ Kategori</button>
+  </div>`;
+  if(doneCount){
+    html+=`<div style="margin:-6px 0 12px;text-align:right"><button onclick="clearBought()" style="border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:9px;padding:7px 12px;font-size:12.5px;cursor:pointer;font-family:'Inter',sans-serif">Alınanları temizle (${doneCount})</button></div>`;
+  }
+  if(!db.shoppingCats.length){
+    html+=`<div class="empty">Henüz kategori yok. "+ Kategori" ile başla.</div>`;
+  } else {
+    html+=db.shoppingCats.map(cat=>{
+      const items=db.shopping.filter(x=>x.catId===cat.id).sort((a,b)=>(a.done===b.done)?0:(a.done?1:-1));
+      const rows=items.map(it=>`
+        <div class="subrow">
+          <input type="checkbox" ${it.done?'checked':''} onchange="toggleShoppingItem('${it.id}')">
+          <div class="txt ${it.done?'done':''}">${esc(it.text)}</div>
+          <button class="edit" onclick="editShoppingItem('${it.id}')">düzenle</button>
+          <button class="del" onclick="delShoppingItem('${it.id}')">×</button>
+        </div>`).join('') || `<div class="empty" style="padding:8px">Bu kategoride madde yok.</div>`;
+      return `<div class="card">
+        <div class="dev-head">
+          <div class="dev-title"><div class="name">${esc(cat.name)}</div></div>
+          <div style="display:flex;gap:2px;flex:0 0 auto">
+            <button onclick="editShoppingCat('${cat.id}')" style="border:none;background:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px 4px">düzenle</button>
+            <button onclick="delShoppingCat('${cat.id}')" style="border:none;background:none;color:var(--dim);font-size:12px;cursor:pointer;padding:2px 4px">sil</button>
+          </div>
+        </div>
+        <div style="margin-top:6px">${rows}</div>
+        <div class="addfault"><input id="sci-${cat.id}" placeholder="Madde ekle" onkeydown="if(event.key==='Enter')addShoppingItem('${cat.id}')"><button onclick="addShoppingItem('${cat.id}')">Ekle</button></div>
+      </div>`;
+    }).join('');
+  }
+  box.innerHTML=html;
+}
+
+/* ---------- REPORT ---------- */
+let dayPlanOpen=false;
+let planFilter=null;
+function togglePlanFilter(f){
+  planFilter = (planFilter===f) ? null : f;
+  renderDay();
+}
+function planGoToTask(id){
+  const t=db.tasks.find(x=>x.id===id); if(!t){ toast('İş bulunamadı (silinmiş olabilir)'); return; }
+  document.getElementById('view-day').style.display='none';
+  document.body.classList.remove('plan');
+  const targetMode=t.type||'biyomedikal';
+  if(mode!==targetMode) setMode(targetMode);
+  document.getElementById('taskSearch').value='';
+  document.getElementById('taskFilter').value='acik';
+  switchTab('task');
+  document.getElementById('texp-'+id)?.classList.add('open');
+  setTimeout(()=>{ document.getElementById('texp-'+id)?.scrollIntoView({behavior:'smooth', block:'center'}); },60);
+}
+function renderDay(){
+  const box=document.getElementById('view-day');
+  const t=today();
+  const pOrder={yuksek:0,orta:1,dusuk:2};
+  const pName={yuksek:'Yüksek',orta:'Orta',dusuk:'Düşük'};
+  const items=[];
+  db.tasks.filter(x=>!x.done).forEach(x=>{
+    try{
+      const subsArr = Array.isArray(x.subtasks) ? x.subtasks : [];
+      const openSubs = subsArr.filter(s=>s && !s.done);
+      if(openSubs.length){
+        // açık alt görevi olan iş: sadece alt görevleri sırala, ana başlığı ekleme
+        openSubs.forEach(s=>{
+          items.push({ kind:'alt', id:x.id, type:x.type||'biyomedikal', title:s.text||'(başlıksız alt görev)', parent:x.title, prio:s.prio||'orta', due:s.due,
+            dur:s.duration||'oturum', dev:s.device?db.devices.find(d=>d.id===s.device):null });
+        });
+      } else {
+        // alt görevi olmayan ya da tümü kapanmış iş: ana başlığı ekle
+        items.push({ kind:'iş', id:x.id, type:x.type||'biyomedikal', title:x.title, prio:x.prio, due:x.due,
+          dur:x.duration||'oturum', dev:x.device?db.devices.find(d=>d.id===x.device):null });
+      }
+    }catch(e){
+      console.warn('Plan: bir iş işlenirken hata, iş kendisi gösteriliyor', x, e);
+      items.push({ kind:'iş', id:x.id, type:x.type||'biyomedikal', title:x.title||'(başlıksız iş)', prio:x.prio||'orta', due:x.due,
+        dur:x.duration||'oturum', dev:null });
+    }
+  });
+  // Sıralama mantığı: son tarihi yaklaşan/geçmiş (≤3 gün) işler her zaman önde — bunlarda sıra
+  // gün + önceliğe göre. Acil olmayanlarda ise önce süre (kısa işler önde — momentum/hızlı kazanım),
+  // sonra öncelik, sonra (varsa) son tarih.
+  const URGENT_DAYS=3;
+  const rank=it=>{
+    const dw=DUR_W[it.dur||'oturum'];
+    if(it.due){
+      const d=daysBetween(t,it.due);
+      if(d<=URGENT_DAYS) return [0, d, pOrder[it.prio], dw];
+    }
+    return [1, dw, pOrder[it.prio], it.due?daysBetween(t,it.due):999];
+  };
+  const cmp=(a,b)=>{ const ra=rank(a),rb=rank(b); for(let i=0;i<ra.length;i++){ if(ra[i]!==rb[i]) return ra[i]-rb[i]; } return 0; };
+  const filtered = planFilter ? items.filter(i=>i.type===planFilter) : items;
+  const all=filtered.slice().sort(cmp);
+
+  const dObj=new Date(t+'T12:00:00');
+  const gunAdi=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'][dObj.getDay()];
+
+  const row=(it,idx)=>{
+    const dueTxt = it.due ? (daysBetween(t,it.due)<0?`${it.due} · gecikti`:daysBetween(t,it.due)===0?`bugün`:it.due) : '';
+    const urgent = it.due && daysBetween(t,it.due)<=0;
+    return `<div class="dayrow ${idx===0?'top':''}" onclick="planGoToTask('${it.id}')" style="cursor:pointer">
+      <div class="dayrow-num">${idx+1}</div>
+      <div class="dayrow-body">
+        <div class="dayrow-title">${it.kind==='alt'?'↳ ':''}${esc(it.title)}</div>
+        <div class="dayrow-meta">
+          <span class="tag-mini ${it.type==='kisisel'?'k':'b'}">${it.type==='kisisel'?'Kişisel':'Biyomedikal'}</span>
+          <span class="prio p-${it.prio}" style="font-size:9px">${pName[it.prio]}</span>
+          <span class="tag-mini d">${esc(DUR_LABEL[it.dur||'oturum'])}</span>
+          ${it.dev?`<span style="color:var(--blue);font-size:11px">${esc(it.dev.name)}</span>`:''}
+          ${it.parent?`<span style="color:var(--dim);font-size:11px">(${esc(it.parent)})</span>`:''}
+          ${dueTxt?`<span style="color:${urgent?'var(--red)':'var(--dim)'};font-size:11px;font-weight:${urgent?'700':'400'}">⏱ ${dueTxt}</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  };
+
+  box.innerHTML=`
+    <div class="day-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div>
+        <div class="day-date">${gunAdi} · ${t}</div>
+        <div class="day-sub">${all.length} açık madde — en üsttekiyle başla</div>
+      </div>
+      <button onclick="closePlan()" style="flex:0 0 auto;border:1px solid var(--accent-dim);background:var(--surface);color:var(--accent);border-radius:9px;padding:8px 14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px">✕ Kapat</button>
+    </div>
+    ${all.length? all.map(row).join('') : `<div class="empty" style="padding:40px 10px">${planFilter?'Bu türde açık madde yok.':'Açık iş yok. Güzel — kafan net.'}</div>`}
+    <div style="color:var(--dim);font-size:12px;padding:14px 4px;line-height:1.5">Sıralama: son tarihi ≤3 gün kalan/geçmiş işler her zaman önde (gün → öncelik). Diğerlerinde önce süre (kısa işler önde), sonra öncelik. Günü <i>zekice</i> böldürmek için "Asistan dosyası"nı sohbete getir.</div>`;
+}
+function renderReport(){
+  const dev=db.devices, allTasks=db.tasks.filter(t=>(t.type||'biyomedikal')===mode);
+  const open=allTasks.filter(t=>!t.done), done=allTasks.filter(t=>t.done);
+  const byStatus=s=>dev.filter(d=>d.status===s).length;
+  const expiring=dev.filter(d=>d.contract==='var'&&d.cend&&daysBetween(today(),d.cend)>=0&&daysBetween(today(),d.cend)<=30);
+  const expired=dev.filter(d=>d.contract==='var'&&d.cend&&daysBetween(today(),d.cend)<0);
+  const durations=done.filter(t=>t.closed).map(t=>daysBetween(t.created,t.closed));
+  const avg=durations.length?(durations.reduce((a,b)=>a+b,0)/durations.length).toFixed(1):'—';
+  const oldest=open.slice().sort((a,b)=>a.created.localeCompare(b.created))[0];
+  const devBlocks = mode==='biyomedikal' ? `
+    <div class="rep"><h3>Cihazlar</h3>
+      <div class="stat"><span>Toplam cihaz</span><b>${dev.length}</b></div>
+      <div class="stat"><span>Faal</span><b>${byStatus('faal')}</b></div>
+      <div class="stat"><span>Kısıtlı</span><b>${byStatus('kisitli')}</b></div>
+      <div class="stat"><span>Kullanım dışı</span><b>${byStatus('dagilik')}</b></div>
+    </div>
+    <div class="rep"><h3>Bakım anlaşmaları</h3>
+      <div class="stat"><span>30 gün içinde dolacak</span><b style="color:var(--amber)">${expiring.length}</b></div>
+      <div class="stat"><span>Süresi dolmuş</span><b style="color:var(--red)">${expired.length}</b></div>
+      ${expiring.concat(expired).map(d=>`<div class="stat"><span>${esc(d.name)}</span><b>${esc(d.cend)}</b></div>`).join('')}
+    </div>` : '';
+  document.getElementById('view-rep').innerHTML=`
+    ${devBlocks}
+    <div class="rep"><h3>İşler — ${mode==='biyomedikal'?'Biyomedikal':'Kişisel'}</h3>
+      <div class="stat"><span>Açık iş</span><b>${open.length}</b></div>
+      <div class="stat"><span>Tamamlanan (toplam)</span><b>${done.length}</b></div>
+      <div class="stat"><span>Ortalama tamamlanma süresi</span><b>${avg} gün</b></div>
+      <div class="stat"><span>En eski açık iş</span><b>${oldest?esc(oldest.title)+' ('+daysBetween(oldest.created,today())+'g)':'—'}</b></div>
+    </div>`;
+}
+
+/* ---------- HISTORY (TARİHÇE) ---------- */
+function historyEntries(){
+  const items=[];
+  db.devices.forEach(d=>{
+    items.push({ when:d.created+(d.createdTime?' '+d.createdTime:''), text:`Cihaz eklendi: ${d.name}`, type:'biyomedikal', deviceId:d.id });
+    (d.faults||[]).forEach(f=>{
+      items.push({ when:f.when, text:`${d.name}: ${f.what}`, type:'biyomedikal', deviceId:d.id });
+    });
+  });
+  db.tasks.forEach(t=>{
+    const ty=t.type||'biyomedikal';
+    const devId=t.device||null;
+    items.push({ when:t.created+(t.createdTime?' '+t.createdTime:''), text:`Açıldı: ${t.title}`, type:ty, deviceId:devId });
+    if(t.done && t.closed){
+      items.push({ when:t.closed+(t.closedTime?' '+t.closedTime:''), text:`Tamamlandı: ${t.title}`, type:ty, deviceId:devId });
+    }
+    (t.log||[]).forEach(l=>{
+      items.push({ when:l.when, text:`${t.title}: ${l.what}`, type:ty, deviceId:devId });
+    });
+  });
+  items.sort((a,b)=>b.when.localeCompare(a.when));
+  return items;
+}
+function renderHistory(){
+  const listBox=document.getElementById('histList');
+  const q=(document.getElementById('histSearch').value||'').toLowerCase();
+  const devFilter=document.getElementById('histDeviceFilter').value;
+  const all=historyEntries();
+  let items = histFilter ? all.filter(it=>it.type===histFilter) : all;
+  if(devFilter) items=items.filter(it=>it.deviceId===devFilter);
+  if(q) items=items.filter(it=>it.text.toLowerCase().includes(q));
+
+  if(!items.length){
+    const reason = q||devFilter||histFilter ? 'Bu filtrelerle eşleşen kayıt yok.' : 'Henüz tarih kayıtlı bir işlem yok.';
+    listBox.innerHTML=`<div class="empty">${reason}</div>`; return;
+  }
+  const filterLabel = histFilter ? ` — ${histFilter==='kisisel'?'Kişisel':'Biyomedikal'}` : '';
+  listBox.innerHTML=`<div class="rep"><h3>Tarihçe${filterLabel} (${items.length})</h3>` +
+    items.map(it=>`<div class="fault"><span class="when">${esc(it.when)}</span><span class="what"><span class="tag-mini ${it.type==='kisisel'?'k':'b'}" style="margin-right:6px">${it.type==='kisisel'?'Kişisel':'Biyomedikal'}</span>${esc(it.text)}</span></div>`).join('') +
+    `</div>`;
+}
+
+/* ---------- FAALİYET RAPORU (gerçek .xlsx, kütüphanesiz) ---------- */
+// Bazı Office sürümleri (mobil/web Excel dahil) eski "SpreadsheetML" XML hilesini
+// desteklemiyor ("dosya türü desteklenmiyor" hatası). Bu yüzden gerçek bir .xlsx
+// (ZIP + OOXML) dosyasını elle, "store" (sıkıştırmasız) yöntemle üretiyoruz —
+// hâlâ hiçbir kütüphane/internet gerekmiyor, ama artık her Excel/Sheets/LibreOffice
+// sürümünde doğrudan açılıyor. (LibreOffice ile gerçek dosya üretip test edildi.)
+const FR_CRC_TABLE=(()=>{ const t=[]; for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++){ c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); } t[n]=c>>>0; } return t; })();
+function frCrc32(bytes){ let crc=0xFFFFFFFF; for(let i=0;i<bytes.length;i++){ crc=FR_CRC_TABLE[(crc^bytes[i])&0xFF]^(crc>>>8); } return (crc^0xFFFFFFFF)>>>0; }
+function frZipWriter(){
+  const chunks=[]; let length=0;
+  const push=arr=>{ chunks.push(arr); length+=arr.length; };
+  return {
+    u16(v){ push(new Uint8Array([v&0xFF,(v>>>8)&0xFF])); },
+    u32(v){ push(new Uint8Array([v&0xFF,(v>>>8)&0xFF,(v>>>16)&0xFF,(v>>>24)&0xFF])); },
+    bytes(arr){ push(arr); },
+    get length(){ return length; },
+    build(){ const out=new Uint8Array(length); let o=0; chunks.forEach(c=>{ out.set(c,o); o+=c.length; }); return out; }
+  };
+}
+function frDosDateTime(d){
+  const time=((d.getHours()&0x1F)<<11)|((d.getMinutes()&0x3F)<<5)|((d.getSeconds()>>1)&0x1F);
+  const date=(((d.getFullYear()-1980)&0x7F)<<9)|(((d.getMonth()+1)&0xF)<<5)|(d.getDate()&0x1F);
+  return {time,date};
+}
+function frBuildZip(files){
+  const w=frZipWriter();
+  const {time,date}=frDosDateTime(new Date());
+  const offsets=[];
+  files.forEach(f=>{
+    const nameBytes=new TextEncoder().encode(f.name);
+    const crc=frCrc32(f.data);
+    offsets.push(w.length);
+    w.u32(0x04034b50); w.u16(20); w.u16(0x0800); w.u16(0);
+    w.u16(time); w.u16(date); w.u32(crc);
+    w.u32(f.data.length); w.u32(f.data.length);
+    w.u16(nameBytes.length); w.u16(0);
+    w.bytes(nameBytes); w.bytes(f.data);
+  });
+  const centralStart=w.length;
+  files.forEach((f,i)=>{
+    const nameBytes=new TextEncoder().encode(f.name);
+    const crc=frCrc32(f.data);
+    w.u32(0x02014b50); w.u16(20); w.u16(20); w.u16(0x0800); w.u16(0);
+    w.u16(time); w.u16(date); w.u32(crc);
+    w.u32(f.data.length); w.u32(f.data.length);
+    w.u16(nameBytes.length); w.u16(0); w.u16(0);
+    w.u16(0); w.u16(0); w.u32(0);
+    w.u32(offsets[i]);
+    w.bytes(nameBytes);
+  });
+  const centralSize=w.length-centralStart;
+  w.u32(0x06054b50); w.u16(0); w.u16(0);
+  w.u16(files.length); w.u16(files.length);
+  w.u32(centralSize); w.u32(centralStart); w.u16(0);
+  return w.build();
+}
+function frXmlEsc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\r\n/g,'\n').replace(/\n/g,'&#10;');
+}
+function frFormatDate(iso){
+  // 'YYYY-MM-DD' veya 'YYYY-MM-DD HH:MM' -> 'DD.MM.YYYY' / 'DD.MM.YYYY HH:MM'
+  if(!iso) return '';
+  const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?/);
+  if(!m) return iso;
+  return `${m[3]}.${m[2]}.${m[1]}${m[4]?' '+m[4]:''}`;
+}
+const FR_COL_WIDTHS=[9.86,18.29,19.14,17.14,15,19.86,20.57,37.86,27.86,33.0,33.29]; // orijinal örnekle birebir aynı (Model sütunu orijinalde özel genişlik tanımlı değildi, okunabilir bir değer seçildi)
+function frEstimateLines(text, charWidth){
+  const rawLines=String(text==null?'':text).split('\n');
+  let total=0;
+  rawLines.forEach(line=>{ total+=Math.max(1, Math.ceil(line.length/Math.max(6,charWidth))); });
+  return total;
+}
+function frColLetter(n){
+  let s=''; n++;
+  while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); }
+  return s;
+}
+function buildFaaliyetXlsx(headers, rows){
+  const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+</Types>`;
+  const rootRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+</Relationships>`;
+  const coreProps=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:title>Biyomedikal Birimi Faaliyet Raporu</dc:title>
+</cp:coreProperties>`;
+  const workbookXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Faaliyet Raporu" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`;
+  const workbookRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+  const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;₺&quot;#,##0.00"/></numFmts>
+<fonts count="2">
+<font><sz val="11"/><name val="Arial"/></font>
+<font><sz val="11"/><name val="Arial"/><b/><color rgb="FFFFFFFF"/></font>
+</fonts>
+<fills count="3">
+<fill><patternFill patternType="none"/></fill>
+<fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF2E75B6"/><bgColor indexed="64"/></patternFill></fill>
+</fills>
+<borders count="2">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>
+</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="4">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+  const cols=FR_COL_WIDTHS.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
+  const headerCells=headers.map((h,ci)=>`<c r="${frColLetter(ci)}1" s="1" t="inlineStr"><is><t xml:space="preserve">${frXmlEsc(h)}</t></is></c>`).join('');
+  const headerRow=`<row r="1" ht="50" customHeight="1">${headerCells}</row>`;
+  const dataRows=rows.map((r,ri)=>{
+    const rIdx=ri+2;
+    const maxLines=Math.max(1, ...r.map((v,ci)=>frEstimateLines(v, FR_COL_WIDTHS[ci])));
+    const h=Math.max(20, maxLines*15);
+    const cells=r.map((v,ci)=>{
+      const ref=frColLetter(ci)+rIdx;
+      const isMoneyCol = ci===9 || ci===10; // J: Firma Teknik Servis Ücreti, K: Yedek Parça Ücreti
+      const styleId = isMoneyCol ? 3 : 2;
+      if(typeof v==='number') return `<c r="${ref}" s="${styleId}"><v>${v}</v></c>`;
+      if(!v) return `<c r="${ref}" s="${styleId}"/>`; // boş hücre — para birimi biçimi girilecek sayıya hazır bekler
+      return `<c r="${ref}" s="${styleId}" t="inlineStr"><is><t xml:space="preserve">${frXmlEsc(v)}</t></is></c>`;
+    }).join('');
+    return `<row r="${rIdx}" ht="${h}" customHeight="1">${cells}</row>`;
+  }).join('');
+  const sheetXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>
+<cols>${cols}</cols>
+<sheetData>${headerRow}${dataRows}</sheetData>
+<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>
+<pageSetup paperSize="9" orientation="portrait"/>
+</worksheet>`;
+  const enc=s=>new TextEncoder().encode(s);
+  const files=[
+    {name:'[Content_Types].xml', data:enc(contentTypes)},
+    {name:'_rels/.rels', data:enc(rootRels)},
+    {name:'docProps/core.xml', data:enc(coreProps)},
+    {name:'xl/workbook.xml', data:enc(workbookXml)},
+    {name:'xl/_rels/workbook.xml.rels', data:enc(workbookRels)},
+    {name:'xl/styles.xml', data:enc(stylesXml)},
+    {name:'xl/worksheets/sheet1.xml', data:enc(sheetXml)},
+  ];
+  const bytes=frBuildZip(files);
+  return new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function openFaaliyetRaporu(){
+  document.getElementById('faaliyetRaporModal').classList.add('open');
+  document.getElementById('fr_personel').value=(db.settings&&db.settings.personelAdi)||'';
+  document.getElementById('fr_start').value='';
+  document.getElementById('fr_end').value='';
+}
+function generateFaaliyetRaporu(){
+  const personel=document.getElementById('fr_personel').value.trim();
+  const start=document.getElementById('fr_start').value||null;
+  const end=document.getElementById('fr_end').value||null;
+  if(!db.settings) db.settings={};
+  db.settings.personelAdi=personel;
+  saveDb();
+
+  const inRange=(dateStr)=>{
+    if(!dateStr) return false;
+    const d=String(dateStr).slice(0,10);
+    if(start && d<start) return false;
+    if(end && d>end) return false;
+    return true;
+  };
+
+  let tasks=db.tasks.filter(t=>(t.type||'biyomedikal')==='biyomedikal');
+  if(start||end){
+    tasks=tasks.filter(t=> inRange(t.created) || (t.done&&t.closed&&inRange(t.closed)) || (t.log||[]).some(l=>inRange(l.when)) );
+  } else {
+    tasks=tasks.filter(t=>!t.done);
+  }
+  tasks=tasks.slice().sort((a,b)=>a.created.localeCompare(b.created));
+
+  if(!tasks.length){ toast('Bu kriterlere uyan iş bulunamadı'); return; }
+
+  const rows=tasks.map((t,i)=>{
+    const dev=t.device?db.devices.find(d=>d.id===t.device):null;
+    const lokasyon=dev?[dev.dept,dev.unit].filter(Boolean).join(' / '):'';
+    const gelisme=(t.log||[]).slice().reverse().map(l=>`${frFormatDate(l.when)}\n${l.what}`).join('\n\n');
+    return [ i+1, lokasyon, dev?dev.name:'', dev?dev.brand:'', dev?dev.model:'', dev?dev.asset:'',
+      t.title||'', gelisme||'—', personel, '', '' ];
+  });
+
+  const headers=['Sıra\nNo','Lokasyon\n(A.B.D. / B.D.)','Cihaz Adı','Marka','Model','Demirbaş No','Cihazın Arızası',
+    'Biyomedikal Birimi İş Açıklaması\n(Onarıldı, İhale Dosyası Hazırlandı, Firmaya Haber Verildi vb.)','Görevli Personel',
+    'Firma Teknik Servis Ücreti\n(TL Cinsinden)','Yedek Parça / Sıfır Parça Ücreti\n(TL Cinsinden)'];
+
+  const blob=buildFaaliyetXlsx(headers, rows);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='Biyomedikal_Faaliyet_Raporu-'+today().replace(/-/g,'')+'.xlsx';
+  a.click(); URL.revokeObjectURL(a.href);
+  closeModal('faaliyetRaporModal');
+  toast(`${rows.length} iş içeren rapor indirildi`);
+}
+
+/* ---------- EXPORT ---------- */
+function backupStamp(){
+  const d=new Date();
+  const p=n=>String(n).padStart(2,'0');
+  return String(d.getFullYear()).slice(-2)+p(d.getMonth()+1)+p(d.getDate())+p(d.getHours())+p(d.getMinutes());
+}
+function exportBackup(){
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='asistan-yedek-'+backupStamp()+'.json'; a.click(); URL.revokeObjectURL(a.href);
+  markBackedUp();
+  toast('Yedek indirildi');
+}
+function importBackup(ev){
+  const file=ev.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ const d=JSON.parse(r.result);
+    if(!Array.isArray(d.devices)||!Array.isArray(d.tasks)) throw 0;
+    if(!Array.isArray(d.shopping)) d.shopping=[];
+    if(!Array.isArray(d.shoppingCats)) d.shoppingCats=[];
+    if(!Array.isArray(d.maintenance)) d.maintenance=[];
+    if(!d.settings || typeof d.settings!=='object') d.settings={};
+    db=d;
+    migrateServisRecords(); migrateSvcDoneField(); scrubKisiselServis(); // yedek eski biçimdeyse burada da tamamlansın — sayfa yenilenmesini beklemesin
+    db=d; saveDb(true); markBackedUp(); renderAll(); toast('Yedek yüklendi');
+  }catch(e){ toast('Geçersiz yedek dosyası'); } };
+  r.readAsText(file); ev.target.value='';
+}
+const CORE = `Sen benim görev asistanımsın. Bu metindeki tüm kurallar kendi içinde geçerlidir; harici hafızaya ihtiyaç duymaz. Bir sohbette bu metni gördüğünde aşağıdaki kurallara göre davran.
+
+BEN KİMİM / ÇALIŞMA ŞEKLİM
+- Ultra-focus ile çalışırım; aynı anda tek işe kilitlenirim. Askıda kalan işler (open loop) bende birikir ve kilitlenmeye yol açar.
+- Uzun listeler beni felç eder. Bir işin nereden başlayacağını göremezsem hiç başlayamam.
+
+GÜNÜMÜN YAPISI
+- Hafta içi 08:00-16:00 arası hastanede biyomedikal biriminde çalışıyorum.
+- Bu saatlerde sadece işyerinde yapılabilecek işleri planla; kişisel işleri 16:00 sonrasına veya hafta sonuna koy.
+- Telefonla halledilebilen kısa işler (arama, randevu, evrak) mesai içine sığabilir; onları o saatlere koy.
+- Mesai sonrası enerjim düşük olur; akşamlara ağır iş koyma.
+
+GÖREVİN
+- Bana asla uzun liste verme. Her seferinde TEK sonraki adım söyle.
+- İş büyükse önce adımlandırma soruları sor (ilk fiziksel hareket ne? kimden onay gerekiyor? tek oturuşta biter mi? son tarih var mı?), sonra tek oturuşta bitebilecek adımlara böl. 90 dakikayı aşan adımı böl.
+- Her adım için tahmini süre ver; ben düzeltirsem güncelle.
+- "Bugün ne?" dersem: kaç saatim olduğunu sor, o süreye sığan tek işi/adımı ver, günü doldurma.
+- "Kilitlendim" dersem: o işin en küçük ilk hareketini söyle, başka hiçbir şey ekleme.
+
+BU DOSYADAKİ VERİYLE ÇALIŞMA
+- Aşağıda Envanter uygulamamdan çıkan güncel iş durumu var (açık işler, yaklaşan bakım anlaşmaları, faal olmayan cihazlar, kişisel işler dahil).
+- Her işin yanında köşeli parantezde bir süre etiketi var: Dakikalar / Tek oturum / Günler / Haftalar+. Bu, işin gerçek uzunluğunu gösterir. "Günler"/"Haftalar+" etiketli bir işi tek adım gibi verme — önce adımlara böl.
+- Bunu o anki güncel iş listem kabul et ve günümü/haftamı ona göre planla. Biyomedikal işleri mesai saatine, kişisel işleri mesai dışına yerleştir.
+- Tekrar eden işleri ayrı tut; sadece sırası gelince gündeme getir.
+
+TON
+- Kısa yaz. Motivasyon konuşması, uzun açıklama, tekrar yok.
+- "Oldu" dersem o işi kapat, tebrik etme; sıradakini sorarsam söyle.
+`;
+
+function summaryText(){
+  const t=today();
+  let s=`== ASİSTAN — GÜNCEL DURUM (${t}) ==\n(Seri/demirbaş numaraları planlama için dahil edilmemiştir.)\n\n`;
+  const label={biyomedikal:'BİYOMEDİKAL',kisisel:'KİŞİSEL'};
+  ['biyomedikal','kisisel'].forEach(ty=>{
+    const open=db.tasks.filter(x=>!x.done && (x.type||'biyomedikal')===ty).sort((a,b)=>{
+      const p={yuksek:0,orta:1,dusuk:2}; return p[a.prio]-p[b.prio] || a.created.localeCompare(b.created);
+    });
+    s+=`-- AÇIK İŞLER: ${label[ty]} (${open.length}) --\n`;
+    if(!open.length) s+=`(yok)\n`;
+    open.forEach(x=>{
+      const dev=x.device?db.devices.find(d=>d.id===x.device):null;
+      s+=`- [${x.prio.toUpperCase()}] [${DUR_LABEL[x.duration||'oturum']}] ${x.title}`;
+      if(dev) s+=` (cihaz: ${dev.name}${devPlace(dev)?', '+devPlace(dev):''})`;
+      s+=` — açılış ${x.created}${x.createdTime?' '+x.createdTime:''}, ${daysBetween(x.created,t)} gündür açık`;
+      if(x.due) s+=`, son tarih ${x.due}`;
+      if(x.repeat&&x.repeat!=='tek') s+=`, tekrar eden`;
+      if(x.note) s+=`\n    not: ${x.note}`;
+      const openSubs=(x.subtasks||[]).filter(su=>!su.done);
+      if(openSubs.length){ s+=`\n    açık alt görevler:`; openSubs.forEach(su=>{ s+=`\n      · ${su.text}${su.prio&&su.prio!=='orta'?' ['+su.prio+']':''} [${DUR_LABEL[su.duration||'oturum']}]${su.due?' (son tarih '+su.due+')':''}`; }); }
+      const lastLog=(x.log||[])[0];
+      if(lastLog) s+=`\n    son gelişme: ${lastLog.what} (${lastLog.when})`;
+      s+=`\n`;
+    });
+    s+=`\n`;
+  });
+  const expiring=db.devices.filter(d=>d.contract==='var'&&d.cend&&daysBetween(t,d.cend)<=30).sort((a,b)=>a.cend.localeCompare(b.cend));
+  s+=`-- YAKLAŞAN / DOLMUŞ ANLAŞMALAR (${expiring.length}) --\n`;
+  if(!expiring.length) s+=`(yok)\n`;
+  expiring.forEach(d=>{ const left=daysBetween(t,d.cend);
+    s+=`- ${d.name}${devPlace(d)?' ('+devPlace(d)+')':''}: ${left<0?'DOLDU '+(-left)+' gün önce':left+' gün kaldı'} (${d.cend})${d.scope?' — '+d.scope:''}\n`; });
+  const upcomingBakim=faaliyetItems().filter(b=>!b.done && b.date>=t).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start)).slice(0,15);
+  s+=`\n-- YAKLAŞAN FAALİYETLER: BAKIM/SERVİS (${upcomingBakim.length}) --\n`;
+  if(!upcomingBakim.length) s+=`(planlanmış bakım/servis yok)\n`;
+  upcomingBakim.forEach(b=>{
+    const dev=b.device?db.devices.find(x=>x.id===b.device):null;
+    const label = b.kind==='servis' ? `[Servis] ${b.task.title}` : `[Bakım] ${dev?dev.name:'(silinmiş cihaz)'}`;
+    const place = dev&&devPlace(dev)?' ('+devPlace(dev)+')':'';
+    s+=`- ${label}${place}: ${b.date}${b.start?' '+b.start:''}${b.end?'–'+b.end:''}${b.note?' — '+b.note:''}\n`;
+  });
+  const problem=db.devices.filter(d=>d.status!=='faal');
+  s+=`\n-- FAAL OLMAYAN CİHAZLAR (${problem.length}) --\n`;
+  if(!problem.length) s+=`(hepsi faal)\n`;
+  problem.forEach(d=>{ const last=(d.faults||[])[0];
+    s+=`- ${d.name}${devPlace(d)?' ('+devPlace(d)+')':''}: ${d.status==='kisitli'?'kısıtlı':'kullanım dışı'}${last?' — son kayıt: '+last.what+' ('+last.when+')':''}\n`; });
+  const doneRecent=db.tasks.filter(x=>x.done&&x.closed).sort((a,b)=>b.closed.localeCompare(a.closed)).slice(0,10);
+  s+=`\n-- SON TAMAMLANANLAR (${doneRecent.length}) --\n`;
+  doneRecent.forEach(x=>{ s+=`- ${x.title} — ${x.created} → ${x.closed} (${daysBetween(x.created,x.closed)} gün)\n`; });
+  return s;
+}
+function exportAssistant(){
+  const t=today();
+  const full = CORE + `\n----------------------------------------\n` + summaryText();
+  const blob=new Blob([full],{type:'text/plain'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='asistan-'+t+'.txt'; a.click(); URL.revokeObjectURL(a.href);
+  toast('Asistan dosyası indirildi');
+}
+
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function renderAll(){ renderDevices(); renderTasks(); if(tab==='bakim') renderBakim(); if(tab==='liste') renderListe(); if(tab==='rep') renderReport(); if(tab==='hist') renderHistory(); }
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+function bootApp(){
+  comboInit();
+  deviceCombosInit();
+  taskCombosInit();
+  initSubDrag();
+  loadDb();
+  loadBackupFlag();
+}
+
+initFirebaseApp();
+firebase.auth().onAuthStateChanged(function(user){
+  if(user){ showApp(); bootApp(); }
+  else{ showLoginScreen(); }
+});
+</script>
+</body>
+</html>
