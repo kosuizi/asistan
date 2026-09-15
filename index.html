@@ -1465,7 +1465,7 @@ function renderDevices(){
   if(!list.length){ box.innerHTML=`<div class="empty">${db.devices.length?'Eşleşen cihaz yok.':'Henüz cihaz yok. "+ Cihaz" ile ekle.'}</div>`; return; }
   const sName={faal:'Faal',kisitli:'Kısıtlı',dagilik:'Kullanım dışı'};
   box.innerHTML=list.map(d=>{
-    const faults=(d.faults||[]).map(f=>`<div class="fault"><span class="when" onclick="editFaultWhen('${d.id}','${f.id}')" title="Tarihi/saati düzenle">${esc(f.when)}</span><span class="what">${esc(f.what)}</span><button class="x" onclick="delFault('${d.id}','${f.id}')">×</button></div>`).join('') || '<div class="empty" style="padding:8px">Kayıtlı arıza yok.</div>';
+    const faults=(d.faults||[]).slice().sort((a,b)=>String(b.when).localeCompare(String(a.when))).map(f=>`<div class="fault"><span class="when" onclick="editFaultWhen('${d.id}','${f.id}')" title="Tarihi/saati düzenle">${esc(f.when)}</span><span class="what">${esc(f.what)}</span><button class="x" onclick="delFault('${d.id}','${f.id}')">×</button></div>`).join('') || '<div class="empty" style="padding:8px">Kayıtlı arıza yok.</div>';
     const numsArr=devNumsArr(d);
     const ci=contractInfo(d);
     return `<div class="card">
@@ -2125,7 +2125,7 @@ function renderTasks(){
         <button class="del" onclick="delSub('${t.id}','${s.id}')">×</button>
       </div>`;
     }).join('');
-    const logList=(t.log||[]).map(l=>`<div class="fault"${l.auto?' style="opacity:.72"':''}><span class="when" onclick="editLogWhen('${t.id}','${l.id}')" title="Tarihi/saati düzenle">${esc(l.when)}</span><span class="what"${l.auto?' style="font-style:italic"':''}>${esc(l.what)}</span>${l.auto?'':`<button class="edit" onclick="editLog('${t.id}','${l.id}')" style="border:none;background:none;color:var(--muted);font-size:11px;cursor:pointer;padding:2px 6px">düzenle</button>`}<button class="x" onclick="delLog('${t.id}','${l.id}')">×</button></div>`).join('')||'<div class="empty" style="padding:8px">Henüz kayıt yok.</div>';
+    const logList=(t.log||[]).slice().sort((a,b)=>String(b.when).localeCompare(String(a.when))).map(l=>`<div class="fault"${l.auto?' style="opacity:.72"':''}><span class="when" onclick="editLogWhen('${t.id}','${l.id}')" title="Tarihi/saati düzenle">${esc(l.when)}</span><span class="what"${l.auto?' style="font-style:italic"':''}>${esc(l.what)}</span>${l.auto?'':`<button class="edit" onclick="editLog('${t.id}','${l.id}')" style="border:none;background:none;color:var(--muted);font-size:11px;cursor:pointer;padding:2px 6px">düzenle</button>`}<button class="x" onclick="delLog('${t.id}','${l.id}')">×</button></div>`).join('')||'<div class="empty" style="padding:8px">Henüz kayıt yok.</div>';
     return `<div class="card task">
       <div class="dev-head">
         <div class="dev-title">
