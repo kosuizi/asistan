@@ -493,6 +493,20 @@
   </div>
 </div>
 
+<!-- Faaliyet tamamlama notu modal -->
+<div class="modal" id="tamamNotModal">
+  <div class="sheet">
+    <h3 id="tamamNotTitle">Tamamlandı</h3>
+    <input type="hidden" id="tn_kind">
+    <input type="hidden" id="tn_id">
+    <div class="fld"><label id="tamamNotLabel">Ne yapıldı? (opsiyonel)</label><textarea id="tn_note" placeholder="Kısaca not al…"></textarea></div>
+    <div class="sheet-btns">
+      <button class="cancel" onclick="closeModal('tamamNotModal')">Vazgeç</button>
+      <button class="save" onclick="saveTamamNot()">Tamamlandı işaretle</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Subtask modal -->
@@ -989,9 +1003,56 @@ function editBakim(id){
 }
 function toggleFaaliyetDone(id){
   const item=db.maintenance.find(x=>x.id===id); if(!item) return;
-  item.done=!item.done; item.closed=item.done?today():null;
+  if(!item.done){ openTamamNotModal('bakim', id); return; } // tamamlanırken not sorulur
+  item.done=false; item.closed=null;
   syncFaaliyetDeviceFault(item);
   saveDb(); renderBakim();
+}
+/* ---- Tamamlama notu: bakımda cihazın tarihçesine, serviste ilgili işin günlüğüne eklenir ---- */
+function openTamamNotModal(kind, id){
+  document.getElementById('tn_kind').value=kind;
+  document.getElementById('tn_id').value=id;
+  document.getElementById('tn_note').value='';
+  document.getElementById('tamamNotTitle').textContent = kind==='bakim' ? 'Bakım tamamlandı' : 'Servis tamamlandı';
+  document.getElementById('tamamNotLabel').textContent = kind==='bakim'
+    ? 'Bakımda ne yapıldı? (cihazın tarihçesine eklenecek — opsiyonel)'
+    : 'Serviste ne yapıldı? (işin günlüğüne eklenecek — opsiyonel)';
+  document.getElementById('tamamNotModal').classList.add('open');
+  setTimeout(()=>document.getElementById('tn_note')?.focus(), 60);
+}
+function saveTamamNot(){
+  const kind=document.getElementById('tn_kind').value;
+  const id=document.getElementById('tn_id').value;
+  const note=document.getElementById('tn_note').value.trim();
+  if(kind==='bakim'){
+    const item=db.maintenance.find(x=>x.id===id); if(!item){ closeModal('tamamNotModal'); return; }
+    item.done=true; item.closed=today();
+    syncFaaliyetDeviceFault(item); // plan durumu satırı ("— Tamamlandı") güncellenir
+    if(note){
+      const dev=db.devices.find(d=>d.id===item.device);
+      if(dev){
+        if(!dev.faults) dev.faults=[];
+        dev.faults.unshift({ id:uid(), when:now(), what:note }); // kalıcı, plandan bağımsız tarihçe kaydı
+      }
+    }
+    saveDb(); closeModal('tamamNotModal'); renderBakim();
+    toast('Bakım tamamlandı');
+  } else {
+    const t=db.tasks.find(x=>x.id===id); if(!t){ closeModal('tamamNotModal'); return; }
+    t.svcDone=true;
+    if(!t.log) t.log=[];
+    if(note){
+      const noteEntry={ id:uid(), when:now(), what:note };
+      t.log.unshift(noteEntry);
+      syncLogEntryToDevice(t, noteEntry);
+    }
+    const entry={ id:uid(), when:now(), what:'Servis tamamlandı.', auto:true };
+    t.log.unshift(entry);
+    syncLogEntryToDevice(t, entry);
+    syncServisDeviceFault(t);
+    saveDb(); closeModal('tamamNotModal'); renderBakim(); if(tab==='task') renderTasks();
+    toast('Servis tamamlandı');
+  }
 }
 function delBakim(id){
   if(!confirm('Bu bakım kaydı silinsin mi?')) return;
@@ -1043,9 +1104,10 @@ function quickServis(taskId){
 function toggleServisDone(taskId){
   // Servisin tamamlanma durumu işin kendi "done" alanından bağımsızdır — işi kapatmaz, geri açmaz.
   const t=db.tasks.find(x=>x.id===taskId); if(!t) return;
-  t.svcDone=!t.svcDone;
+  if(!t.svcDone){ openTamamNotModal('servis', taskId); return; } // tamamlanırken not sorulur
+  t.svcDone=false;
   if(!t.log) t.log=[];
-  const entry={ id:uid(), when:now(), what: t.svcDone?'Servis tamamlandı.':'Servis geri açıldı.', auto:true };
+  const entry={ id:uid(), when:now(), what:'Servis geri açıldı.', auto:true };
   t.log.unshift(entry);
   syncLogEntryToDevice(t, entry);
   syncServisDeviceFault(t);
