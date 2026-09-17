@@ -1,4 +1,4 @@
-<!-- Version: v2026.09.13-2112 --><!DOCTYPE html>
+<!-- Version: v2026.09.17-0820 --><!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 :root {
   --bg-primary: #f0f4f9;
@@ -243,7 +244,7 @@ const round2=(v)=>Math.round(v*100)/100;
 
 // ── Hesap Motoru (TrainingPeaks referanslı) ──────────────────────────────────
 
-const APP_VERSION='v2026.09.13-2112';
+const APP_VERSION='v2026.09.17-0820';
 // 🔧 (2026.08.16 — Göksel talebi, 2026.08.19'da panelden açılıp kapanabilir
 // bir anahtara dönüştürüldü): Koşu İzlerim'deki (SporcuPlanView) "🏆 Bu Hafta
 // Liderlik" mini widget'ının sporculara gösterilip gösterilmeyeceğini belirler.
@@ -3403,6 +3404,58 @@ const FB_EMAIL    = 'goxelcelik@gmail.com';
 const FB_PASSWORD = 'Kz#9mPw$vL2qR8!x';           // Firebase Console'd aki şifre
 // ───────────────────────────────────────────────────────────────────────────────
 
+// ─── EmailJS — Sporcu Anket Bildirimi ───────────────────────────────────────
+// Bir sporcu SporcuAnketi formunu (fizyolojik anket) kaydettiğinde, Göksel'e
+// bilgilendirme e-postası gönderilir. Tamamen client-side (bkz. head'deki
+// @emailjs/browser SDK) — bu proje statik hosting kullandığı için (GitHub
+// Pages, sunucu yok) bir Cloud Functions kurulumu yerine tercih edildi.
+// (Göksel talebi, 2026.09.15)
+const EMAILJS_CONFIG={
+  serviceId:'service_kosuizi',
+  templateId:'template_bwknesj',
+  publicKey:'13OvJP4dSU3lpefrM',
+  toEmail:'goxelcelik@gmail.com'
+};
+
+// SporcuAnketi formundan okunabilir bir metin özeti üretir (e-posta içeriği için).
+// mhrPatch/lthrPatch verilirse (onay bekleyen öneriler), bunlar ayrı satır olarak eklenir.
+function anketOzetiOlustur(formLive,mhrPatch,lthrPatch){
+  const satirlar=[];
+  const ekle=function(etiket,deger){
+    if(deger===undefined||deger===null||deger==='')return;
+    satirlar.push(etiket+': '+deger);
+  };
+  ekle('Kilo (kg)',formLive.kilo);
+  ekle('Boy (cm)',formLive.boy);
+  ekle('Dinlenik Nabız (RHR)',formLive.rhr);
+  ekle('VO2max',formLive.vo2max);
+  ekle('HRV Durumu',formLive.hrv_durum);
+  ekle('HRV (7 gün ort.)',formLive.hrv_7gun);
+  ekle('Sakatlık Durumu',formLive.sakatlık);
+  if(mhrPatch&&mhrPatch.mhr_pending!=null)ekle('MHR (öneri, onay bekliyor)',mhrPatch.mhr_pending);
+  if(lthrPatch&&lthrPatch.lthr_pending!=null)ekle('LTHR (öneri, onay bekliyor)',lthrPatch.lthr_pending);
+  ekle('Koşu Günleri',(formLive.kosu_gunleri||[]).join(', '));
+  ekle('Çapraz Antrenman Günleri',(formLive.capraz_gunleri||[]).join(', '));
+  const uzunArr=Array.isArray(formLive.uzun_gun)?formLive.uzun_gun:[formLive.uzun_gun].filter(Boolean);
+  ekle('Uzun Koşu Günü',uzunArr.join(', '));
+  return satirlar.join('\n');
+}
+
+// Anket kaydı başarılı olduktan SONRA çağrılır; e-posta gönderimi asenkron ve
+// "fire and forget"tir — başarısız olsa bile anket kaydını veya kullanıcı
+// deneyimini (Kaydedildi! mesajı) engellemez, sadece console'a uyarı basar.
+function sendAnketBildirimEmail(sporcuAdi,ozet){
+  if(typeof emailjs==='undefined'){console.warn('EmailJS SDK yüklenemedi, anket bildirim e-postası gönderilemedi.');return;}
+  emailjs.send(EMAILJS_CONFIG.serviceId,EMAILJS_CONFIG.templateId,{
+    sporcu_adi:sporcuAdi,
+    tarih:new Date().toLocaleString('tr-TR'),
+    cevap_ozeti:ozet,
+    to_email:EMAILJS_CONFIG.toEmail
+  },{publicKey:EMAILJS_CONFIG.publicKey}).catch(function(e){
+    console.warn('Anket bildirim e-postası gönderilemedi:',e);
+  });
+}
+
 let db=null;
 let _authReady=null; // Auth tamamlanınca resolve olan Promise
 
@@ -3904,6 +3957,19 @@ const GIRIS_ANKETI_FIELDS=[
   {key:'acil_kisi_ad',label:'⚠️ Acil durumda aranacak kişi (Ad Soyad)',type:'text'},
   {key:'acil_kisi_tel',label:'⚠️ Acil durumda aranacak kişinin telefon numarası',type:'text'},
 ];
+
+// Giriş Anketi (onboarding) için okunabilir metin özeti — bildirim e-postasında
+// kullanılır (bkz. handleGirisSave → sendAnketBildirimEmail).
+function girisAnketiOzetiOlustur(girisFormVal){
+  const satirlar=[];
+  GIRIS_ANKETI_FIELDS.forEach(function(f){
+    let deger=girisFormVal[f.key];
+    if(f.type==='multi_priority')deger=Array.isArray(deger)?deger.join(', '):'';
+    if(deger===undefined||deger===null||deger==='')return;
+    satirlar.push(f.label+': '+deger);
+  });
+  return satirlar.join('\n');
+}
 
 // Giriş Anketi'nde soru DEĞİL — koçtan sporcuya tek yönlü, aciliyet içermeyen
 // öneri listesi. Sporcudan yanıt istenmez, sadece bilgilendirme amaçlıdır.
@@ -5863,6 +5929,12 @@ function BugunTab({athletes,workouts,onSelChange,onTabChange,onEkleSeed}){
 // CTA) "sporcularınız" gibi ANTRENÖRE hitap eden ifadeler İÇERMEMELİ — hedef
 // kitle, takıma katılmayı düşünen bir SPORCU. "Senin", "sen" gibi ikinci
 // tekil şahıs kullanılır (ör. "antrenmanının yükü", "sen de yarış").
+//
+// KURAL E — CTA HER ZAMAN AYNI (2026.09.16, Göksel talebi): BUNDAN SONRA
+// eklenecek her yeni kartın CTA metni sabit '🔥 Şimdi sen de katıl 💪🏼'
+// olmalı — kart temasına özel farklı bir CTA metni YAZILMAZ. Mevcut kartların
+// (liderlik/yuk-takibi/tutarlilik) kendi özel CTA'ları geriye dönük
+// değiştirilmez, bu kural yalnızca yeni eklenenler içindir.
 // ══════════════════════════════════════════════════════════════════════════
 //
 // Başlık/açıklama/CTA metinleri her kartın üzerine tıklanarak da düzenlenebilir
@@ -5876,6 +5948,27 @@ function BugunTab({athletes,workouts,onSelChange,onTabChange,onEkleSeed}){
 // LiderlikTab, bkz. satır ~6974 ile AYNI gerçek özelliğin tanıtımı).
 // Kart 2 teması (2026.09.01 eklendi): antrenman yükü takibi — gerçek
 // ChartATLCTL'in (Günlük yük + CTL + ATL) AYNI dili.
+// Kart 4 teması (2026.09.16 eklendi, Göksel talebi): kalibrasyon yöntemleri
+// ile kişiselleştirilmiş nabız bölgeleri. Görsel, gerçek BolgeTab'daki
+// "Bölge Renk Haritası" fonksiyonunun (renderBoundaryRuler, ~satır 24515:
+// %LTHR bazlı 7 bölgeyi gösteren yatay SVG cetvel, güncel/kalibre sınırlar
+// SOLID, standart tabandan farklıysa standart değer DASHED) AYNI dilini
+// (ZONE_COLORS, HR_ZONES_LTHR, HR_BOUNDARY_BASE_PCT — hepsi paylaşılan
+// global sabitler) TEK cetvel olarak kullanır — bkz. AdCardItem'daki
+// 'nabizCetveli' bloğu (2026.09.16 revizyonu: ayrı "Standart Taban Cetveli"
+// ikinci cetveli kaldırıldı, sadece kişiye özel cetvel + içindeki
+// standart/güncel sınır karşılaştırması gösteriliyor).
+// Gerçek sporcu seçilirse calcZones(secilenSporcu) ile GERÇEK LTHR/kalibrasyon
+// durumu çizilir (kalibrasyon hiç uygulanmamışsa standart ile birebir aynı
+// görünür — bu da doğru/beklenen davranıştır); seçilmezse örnekleyici bir
+// mock sporcu (KALIB_MOCK_ATHLETE) üzerinden AYNI calcZones/personalizedHrZoneTable
+// fonksiyonları çalıştırılır (uydurma bir görsel biçim DEĞİL, gerçek hesaplama
+// mock girdiyle çalıştırılmış hali).
+// NOT — "Jenerik" → "Standart" terim değişikliği (2026.09.16, Göksel talebi):
+// bu terim ("jenerik nabız bölgesi formülü") gerçek BolgeTab'da da kullanıldığı
+// için (bkz. renderGenericBaselineRuler, ~satır 24647 ve civarındaki tüm
+// KULLANICIYA GÖRÜNEN metinler) KURAL A gereği iki yerde de birlikte
+// "Standart" olarak güncellendi — sadece bu ad kartında değil.
 //
 // Görsellerdeki isim/skor/yük değerleri HER ZAMAN mockup'tır — gerçek sporcu
 // verisi ASLA kullanılmaz, SADECE reklam_izni===true olan sporcular seçim
@@ -5904,6 +5997,14 @@ const AD_CARDS=[
     aciklama:'Planına ne kadar sadık kaldığını, kaç haftadır kesintisiz antrenman yaptığını otomatik hesaplıyoruz. Reçetendeki her satır — tempo, pace, nabız — tek tek takip edilir.',
     cta:'Sen de disiplinini gör 📊',
     gorsel:'tutarlilikKart'
+  },
+  {
+    id:'nabiz-kalibrasyon',
+    ikon:'📏',
+    baslik:'Doğru Fizyolojik Etki',
+    aciklama:'🔄 Kişiselleştirilmiş nabız bölgeleriyle, doğru yoğunlukta ve amacına uygun antrenmanlar;\n\n🛡️ Aşırı yüklenmeden korur\n⚡ Tam kararında zorlar\n📈 Kalıcı gelişim sağlar',
+    cta:'🔥 Şimdi sen de katıl 💪🏼',
+    gorsel:'nabizCetveli'
   }
 ];
 
@@ -6002,7 +6103,7 @@ function AdCardItem({cardDef,teamName,teamLogo,athletes,override,onSave,allHisto
   // Kartı "anlatan" tek sporcu (mockup ya da seçilen gerçek sporcu) — TEK
   // SPORCU deseni 'yukGrafik' ile 'tutarlilikKart' arasında paylaşılır (bkz.
   // dosya başındaki KURAL C: tekli-kişi kartlarında tek seçim).
-  const TEK_SPORCU_GORSELLER=['yukGrafik','tutarlilikKart'];
+  const TEK_SPORCU_GORSELLER=['yukGrafik','tutarlilikKart','nabizCetveli'];
   const secilenSporcu=TEK_SPORCU_GORSELLER.includes(cardDef.gorsel)&&sporcuSecim?izinliSporcular.find(function(a){return a.id===sporcuSecim;}):null;
   const yukAdSoyad=secilenSporcu?((secilenSporcu.ad||'')+' '+(secilenSporcu.soyad||'')).trim():'Sporcu A';
   const yukFoto=secilenSporcu?secilenSporcu.foto||null:null;
@@ -6084,8 +6185,84 @@ function AdCardItem({cardDef,teamName,teamLogo,athletes,override,onSave,allHisto
     ]}
   ];
 
+  // ── Kart 4 — Nabız Bölgesi Kalibrasyon Cetveli (gerçek BolgeTab'daki
+  // "Bölge Renk Haritası" ile AYNI dil, TEK cetvel — bkz. AD_CARDS üstündeki
+  // Kart 4 teması notu) ────────────────────────────────────────────────────
+  // Örnekleyici (mock) girdi — UYDURMA bir görsel biçim değil, gerçek
+  // calcZones/personalizedHrZoneTable fonksiyonlarına verilen mock bir
+  // sporcu profili. Sadece görünür bir kalibrasyon farkı garanti etmek için
+  // (gerçek sporcularda şu an bariz bir sapma az sayıda — Göksel'in notu).
+  const KALIB_MOCK_ATHLETE={lthr:172,bd_z1z2:1.5,bd_z2z3:-1,bd_z3z4:1.3,bd_z4z5a:0,bd_z5az5b:-1.5,bd_z5bz5c:1.2,vlt:3.4};
+  const _kalibRealZones=cardDef.gorsel==='nabizCetveli'&&secilenSporcu?calcZones(secilenSporcu):null;
+  // Gerçek sporcu seçili VE %LTHR yöntemi kullanıyorsa (Sınır Kalibrasyonu
+  // SADECE bu yöntemi hedefler — bkz. gerçek renderBoundaryRuler'daki aynı
+  // koşul) onun gerçek verisi kullanılır; aksi halde mock'a düşülür.
+  const kalibZones=(_kalibRealZones?.hrZones&&_kalibRealZones.hrZones[0]?.method==='%LTHR')
+    ?_kalibRealZones:calcZones(KALIB_MOCK_ATHLETE);
+  const kalibIsMock=kalibZones===_kalibRealZones?false:true;
+  const kalibLthr=kalibZones.lthr;
 
-
+  // Basit yatay bölge cetveli — gerçek renderBoundaryRuler (BolgeTab, ~satır 24515)
+  // ile AYNI dil (ZONE_COLORS bant renkleri, %LTHR aralığı 65–115, dashed=standart/
+  // solid=güncel sınır ayrımı, TEK cetvel — bkz. yukarıdaki Kart 4 teması notundaki
+  // 2026.09.16 revizyonu); 420px kart genişliğine
+  // sığdırmak için ölçek küçültüldü ve SADECE coach iş akışına özgü "bekleyen
+  // kalibrasyon önerisi" oku (preview/changeLog) çıkarıldı — o kısım ad kartında
+  // anlamsız (henüz uygulanmamış bir tarama sonucu, mockup'ta karşılığı yok).
+  const renderKalibRuler=(hz,showGenericOverlay)=>{
+    const W=368,H=150,padLeft=4,padRight=4,padTop=4,bandH=32;
+    const plotW=W-padLeft-padRight;
+    const rangeLo=HR_ZONES_LTHR[0].lo*100,rangeHi=HR_ZONES_LTHR[HR_ZONES_LTHR.length-1].hi*100;
+    const xFor=pct=>padLeft+((pct-rangeLo)/(rangeHi-rangeLo))*plotW;
+    const halo={paintOrder:'stroke',stroke:'rgba(0,0,0,.55)',strokeWidth:2.5,strokeLinejoin:'round'};
+    const nonScale={vectorEffect:'non-scaling-stroke'};
+    const FS=7.5;
+    const bandEls=[];
+    hz.forEach((z,i)=>{
+      const xL=xFor(z.lo*100),xR=xFor(z.hi*100);
+      const w=Math.max(0,xR-xL);
+      const cx=(xL+xR)/2,cy=padTop+bandH/2;
+      bandEls.push(React.createElement('rect',{key:'b'+i,x:xL,y:padTop,width:w,height:bandH,fill:ZONE_COLORS[z.id]||'#888'}));
+      if(i>0)bandEls.push(React.createElement('line',{key:'s'+i,x1:xL,x2:xL,y1:padTop,y2:padTop+bandH,stroke:'rgba(0,0,0,.35)',strokeWidth:1,...nonScale}));
+      bandEls.push(React.createElement('text',{key:'t'+i,x:cx,y:cy,textAnchor:'middle',dominantBaseline:'middle',fontSize:FS,fontWeight:800,fill:'#fff',...halo},z.id));
+    });
+    // Sınır etiketleri — gerçek BolgeTab'daki "85%·141" formatının AYNISI, altına ikinci
+    // satır olarak pace (bkz. calcZones→paceZones; farklı %VLT eşiğiyle bağımsız hesaplanan
+    // ama AYNI zon ID'sine karşılık gelen sınır — 2026.09.16, Göksel talebi). Etiket 90°
+    // döndürüldüğü için ikinci satır aynı pivot noktasından local +x'te (LFS+3) kaydırılır
+    // — bu, döndürme sonrası ekranda "birinci satırın altında" görünür (rotate(90) altında
+    // local +x → ekran +y eşleniyor).
+    const LFS=7;
+    const pz=kalibZones.paceZones;
+    const boundaryEls=[];
+    const pushLbl=(x,dir,line1,line2,keyBase)=>{
+      const lx=x+(dir==='start'?4:-4),ly=padTop+bandH+8;
+      boundaryEls.push(React.createElement('text',{key:keyBase+'-l1',x:lx,y:ly,fontSize:LFS,fontFamily:'monospace',fill:'rgba(255,255,255,0.6)',textAnchor:'start',transform:'rotate(90 '+lx+' '+ly+')'},line1));
+      // İkinci satır (pace): DOĞRU eksen local +y (satır atlama), local +x DEĞİL — x'i
+      // kaydırmak metni AYNI döndürülmüş satırın devamı yapıyordu (üst üste binmeyen
+      // ama TEK satıra birleşen "86.5%·149 6:32" hatası, 2026.09.16 — Göksel'in ikinci
+      // ekran görüntüsü). rotate(90) altında local +y → ekranda PARALEL bir sütun (satırın
+      // "altı" — döndürmeyi zihinde geri alınca gerçekten alt alta okunur). AYNI pivot
+      // (lx,ly) kullanılıyor, satır uzunluğuna bağlı değil — sabit bir satır yüksekliği yeter.
+      if(line2){
+        const lineHeight=LFS+2;
+        boundaryEls.push(React.createElement('text',{key:keyBase+'-l2',x:lx,y:ly+lineHeight,fontSize:LFS,fontFamily:'monospace',fill:'rgba(255,255,255,0.42)',textAnchor:'start',transform:'rotate(90 '+lx+' '+ly+')'},line2));
+      }
+    };
+    pushLbl(xFor(rangeLo),'start',round1(rangeLo)+'%·'+hz[0].lo_bpm,pz?.[0]?.lo_pace,'outerlo');
+    pushLbl(xFor(rangeHi),'end',round1(rangeHi)+'%·'+hz[hz.length-1].hi_bpm,pz?.[pz.length-1]?.hi_pace,'outerhi');
+    HR_BOUNDARY_KEYS.forEach((k,i)=>{
+      const curPct=hz[i].hi*100;
+      if(showGenericOverlay){
+        const genericPct=HR_BOUNDARY_BASE_PCT[k]*100;
+        const drifted=Math.round(genericPct*10)!==Math.round(curPct*10);
+        if(drifted)boundaryEls.push(React.createElement('line',{key:'g'+k,x1:xFor(genericPct),x2:xFor(genericPct),y1:padTop,y2:padTop+bandH,stroke:'rgba(255,255,255,0.55)',strokeWidth:1.5,strokeDasharray:'2,2',...nonScale}));
+      }
+      boundaryEls.push(React.createElement('line',{key:'c'+k,x1:xFor(curPct),x2:xFor(curPct),y1:padTop,y2:padTop+bandH,stroke:'#fff',strokeWidth:1.5,...nonScale}));
+      pushLbl(xFor(curPct),'start',round1(curPct)+'%·'+hz[i].hi_bpm,pz?.[i]?.hi_pace,'in'+k);
+    });
+    return React.createElement('svg',{width:'100%',viewBox:'0 0 '+W+' '+H,style:{display:'block'}},...bandEls,...boundaryEls);
+  };
 
   const handleShare=async()=>{
     if(!cardRef.current)return;
@@ -6201,8 +6378,15 @@ function AdCardItem({cardDef,teamName,teamLogo,athletes,override,onSave,allHisto
         React.createElement('div',{style:{fontWeight:800,fontSize:13,letterSpacing:1,color:'#fff'}},brandName.toLocaleUpperCase('tr'))
       ),
 
-      // İkon
-      React.createElement('div',{style:{fontSize:44,marginBottom:10}},cardDef.ikon),
+      // İkon — tüm kartlarda fontSize:44 sabit (görsel tutarlılık); 'nabizCetveli'
+      // kartında iki emoji (📏❤️) olduğu için ikisi de EŞİT boyutta, ama diğer
+      // kartların tek-ikon toplam görsel ağırlığıyla uyumlu kalması için 32'ye
+      // düşürüldü (2026.09.16, Göksel'in "eşit boyut + diğer kartlarla uyumlu"
+      // geri bildirimi — önceki 44+20 asimetrik denemesi yerine).
+      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,marginBottom:10}},
+        React.createElement('span',{style:{fontSize:cardDef.gorsel==='nabizCetveli'?32:44,lineHeight:1}},cardDef.ikon),
+        cardDef.gorsel==='nabizCetveli'&&React.createElement('span',{style:{fontSize:32,lineHeight:1}},'❤️')
+      ),
 
       // Başlık (tıkla-düzenle)
       React.createElement('div',{onClick:()=>setEditingBaslik(true),style:{marginBottom:14,cursor:'pointer'}},
@@ -6351,6 +6535,21 @@ function AdCardItem({cardDef,teamName,teamLogo,athletes,override,onSave,allHisto
               );
             })
           )
+        )
+      ),
+      cardDef.gorsel==='nabizCetveli'&&React.createElement('div',{style:{background:'rgba(255,255,255,0.06)',borderRadius:14,padding:'14px 14px 12px',border:'1px solid rgba(255,255,255,0.1)',marginBottom:22}},
+        React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:10}},
+          React.createElement(Avatar,{foto:yukFoto,size:28}),
+          React.createElement('div',{style:{flex:1,minWidth:0}},
+            React.createElement('div',{style:{fontWeight:700,fontSize:12,color:'#f1f5f9'}},yukAdSoyad.toLocaleUpperCase('tr')),
+            React.createElement('div',{style:{fontSize:9,color:'rgba(255,255,255,0.4)'}},'LTHR '+kalibLthr+' bpm'+(kalibIsMock?' · örnek':''))
+          )
+        ),
+        React.createElement('div',{style:{fontSize:9,letterSpacing:0.5,color:'rgba(255,255,255,0.45)',marginBottom:4}},'NABIZ BÖLGELERİ'),
+        renderKalibRuler(kalibZones.hrZones,true),
+        React.createElement('div',{style:{display:'flex',gap:12,marginTop:10,fontSize:8,color:'rgba(255,255,255,0.4)'}},
+          React.createElement('span',null,'┅ standart sınır'),
+          React.createElement('span',null,'▬ senin sınırın')
         )
       ),
 
@@ -8384,25 +8583,40 @@ function LiderlikTab({athletes,workouts,teamName,teamLogo,races,leaderboardWeigh
                 );
               })(),
               (()=>{
+                // 2026.09.15 — Göksel talebi: sadece EN YAKIN yarış değil, sporcunun
+                // hazırlandığı VE yüklenme planı fiilen başlamış (calcPhase 'Temel'
+                // dışına çıkmış — bkz. renderRaceCard'daki AYNI hazirlikBasladi
+                // mantığı, satır ~6881) TÜM yarışlar listelenir. Henüz prep_weeks
+                // penceresine girilmemiş (faz='Temel') veya prep_weeks tanımsız
+                // yarışlar burada gösterilmez — "hazırlandığı" ifadesi fiilen
+                // başlamış bir yükleme planını gerektirir, sadece kayıtlı olmayı değil.
                 const today=new Date();
                 const todayStr=today.toISOString().split('T')[0];
                 const athRaceIds=(row.ath.yarıslar||[]).map(x=>typeof x==='string'?x:x.id);
-                const nearest=(races||[])
+                const activePrep=(races||[])
                   .filter(r=>athRaceIds.includes(r.id)&&r.tarih&&r.tarih>=todayStr)
-                  .map(r=>({...r,daysLeft:Math.ceil((new Date(r.tarih+'T12:00:00')-today)/864e5)}))
-                  .sort((a,b)=>a.daysLeft-b.daysLeft)[0];
-                if(!nearest)return null;
-                const urgent=nearest.daysLeft<=14;
-                const soon=nearest.daysLeft<=30;
-                return React.createElement('div',{style:{
-                  fontSize:10,marginTop:3,
-                  color:nearest.ertelendi?'#fbbf24':urgent?'#f87171':soon?'#fbbf24':'#94a3b8',
-                  fontWeight:nearest.ertelendi||urgent||soon?600:400,
-                  textDecoration:nearest.ertelendi?'line-through':'none',
-                  opacity:nearest.ertelendi?0.75:1
-                }},
-                  '🏁 '+nearest.ad+(nearest.ertelendi?' · Ertelendi':' · '+(nearest.daysLeft===0?'bugün':nearest.daysLeft+' gün'))
-                );
+                  .map(r=>{
+                    const daysLeft=Math.ceil((new Date(r.tarih+'T12:00:00')-today)/864e5);
+                    const phase=r.prep_weeks?calcPhase(todayStr,r.tarih,r.prep_weeks,r,getAthRaceOverride(row.ath,r.id)):null;
+                    const hazirlikBasladi=!!phase&&phase!=='Temel'&&phase!=='Yarış Sonrası';
+                    return{...r,daysLeft,hazirlikBasladi};
+                  })
+                  .filter(r=>r.hazirlikBasladi)
+                  .sort((a,b)=>a.daysLeft-b.daysLeft);
+                if(activePrep.length===0)return null;
+                return activePrep.map(r=>{
+                  const urgent=r.daysLeft<=14;
+                  const soon=r.daysLeft<=30;
+                  return React.createElement('div',{key:r.id,style:{
+                    fontSize:10,marginTop:3,
+                    color:r.ertelendi?'#fbbf24':urgent?'#f87171':soon?'#fbbf24':'#94a3b8',
+                    fontWeight:r.ertelendi||urgent||soon?600:400,
+                    textDecoration:r.ertelendi?'line-through':'none',
+                    opacity:r.ertelendi?0.75:1
+                  }},
+                    '🏁 '+r.ad+(r.ertelendi?' · Ertelendi':' · '+(r.daysLeft===0?'bugün':r.daysLeft+' gün'))
+                  );
+                });
               })()
             ),
             // Metrikler
@@ -9657,24 +9871,24 @@ function fmtPaceLbl(paceSec){
   return m+':'+String(s).padStart(2,'0');
 }
 // ── MAF nabız hedefi — sporcu bazlı dinamik hesap ─────────────────────────
-// Hem 180-yaş hem de LTHR×%80-85 değerlerini hesaplar; mevcut olanları gösterir.
+// SADECE 180−yaş (Maffetone'un orijinal formülü) — LTHR bazlı alternatif YOK.
 function mafNabizDetay(ath, mesafe, sure){
+  // KÖK NEDEN DÜZELTMESİ (15.09.2026 — Göksel kararı): MAF nabzı SADECE
+  // 180−yaş olarak hesaplanır. Önceki sürüm hem 180−yaş hem LTHR×%80-85
+  // versiyonunu aynı satırda gösteriyordu — bu, Maffetone'un orijinal
+  // metodunun parçası olmayan farklı bir çerçeveyi (eşik-nabız bazlı Z2)
+  // "MAF nabzı" etiketi altına karıştırıp sporcuda hangisini uygulayacağı
+  // konusunda kafa karışıklığı yaratıyordu. Kategori düzeltmesi (Maffetone'un
+  // −10/−5/±0/+5 sağlık-geçmişi ayarı) BİLİNÇLİ OLARAK uygulanmıyor — Göksel
+  // ardışık MAF testlerini zaman içinde birbirine kıyaslarken sabit bir
+  // referans (düzeltmesiz 180−yaş) istiyor; kategori değişse kıyaslama
+  // bozulur. LTHR ayrıca hesaplanmıyor/gösterilmiyor.
   const yasHesap=ath?.dogum?new Date().getFullYear()-new Date(ath.dogum).getFullYear():null;
   const mafHR=yasHesap!=null?180-yasHesap:null;
-  const lthrVal=parseSayi(ath?.lthr)||0;
-  const lthrLo=lthrVal>0?Math.round(lthrVal*0.80):null;
-  const lthrHi=lthrVal>0?Math.round(lthrVal*0.85):null;
 
-  let nabizStr;
-  if(mafHR!=null && lthrLo!=null){
-    nabizStr=`MAF nabzı: ${mafHR} bpm (180−${yasHesap}) · LTHR bazlı: ${lthrLo}–${lthrHi} bpm`;
-  } else if(mafHR!=null){
-    nabizStr=`MAF nabzı: ${mafHR} bpm (180−${yasHesap})`;
-  } else if(lthrLo!=null){
-    nabizStr=`MAF nabzı (LTHR bazlı): ${lthrLo}–${lthrHi} bpm`;
-  } else {
-    nabizStr='MAF nabzında (180 − yaş veya LTHR × %80-85)';
-  }
+  const nabizStr=mafHR!=null
+    ? `MAF nabzı: ${mafHR} bpm (180−${yasHesap})`
+    : 'MAF nabzında (180 − yaş)';
   const parcaStr=mesafe||'5 km';
   const sureStr=sure?` (${sure})`:'';
   return `${parcaStr}${sureStr} — ${nabizStr} sabit tut · Nabız hiçbir zaman MAF sınırını aşmamalı · 1., 3. ve 5. km pace'lerini not al`;
@@ -9875,6 +10089,26 @@ function adimToRowsFallback(adim, zones){
   let totalSn=adim.sure_dk>0?adim.sure_dk*60:0;
   if(!totalSn){const m=detay.match(/(\d+(?:[.,]\d+)?)\s*dk/i);if(m)totalSn=Math.round(parseFloat(m[1].replace(',','.'))*60);}
   if(!totalSn){const m=detay.match(/(\d+)\s*sn/i);if(m)totalSn=parseInt(m[1]);}
+  // KÖK NEDEN DÜZELTMESİ (14.09.2026 — Göksel'in bulduğu hata: MAF/5K test satırında
+  // metin "5 km"/"5000m" DİYE BAŞLADIĞI HALDE reçetede ~185m gibi anlamsız bir mesafe
+  // görünüyordu): yukarıdaki iki regex sadece dk/sn arıyor — bu satırın niceliği
+  // DAKİKA/SANİYE değil MESAFE olarak yazılmışsa (TEST_TURLERI.maf ve mafNabizDetay'in
+  // ürettiği "5 km — ..." metni gibi) hiçbiri eşleşmiyor ve totalSn sessizce 60sn
+  // varsayılanına düşüyordu — bu da 60sn'lik pace karşılığı kadar (örn. ~185m) yanlış
+  // bir mesafe göstermeye yol açıyordu. Bu satırların TÜMÜ (bkz. TEST_TURLERI,
+  // mafNabizDetay) asıl niceliği METNİN EN BAŞINDA taşır — bu yüzden SADECE metnin
+  // başındaki bir mesafe ifadesi aranıyor (metnin ortasında geçebilecek "Hedef D+:
+  // ~150m" gibi tırmanış notlarıyla çakışmasın diye ^ ile başa sabitlendi). Mesafe
+  // bulunursa, o an hesaplanan blok pace'i (blokPaceSec) ile süreye çevrilir; altta
+  // calcRow bu süreyi AYNI pace'le tekrar mesafeye çevireceğinden (round-trip) sonuç
+  // her zaman doğru mesafeyi verir — hangi zon/pace tahmin edilmiş olursa olsun.
+  if(!totalSn){
+    const dm=detay.match(/^\s*(\d+(?:[.,]\d+)?)\s*(km|m)\b/i);
+    if(dm){
+      const distM=parseFloat(dm[1].replace(',','.'))*(dm[2].toLowerCase()==='km'?1000:1);
+      if(distM>0) totalSn=Math.round(distM/1000*blokPaceSec);
+    }
+  }
   if(!totalSn) totalSn=60;
   // Tırmanış ana bloğu: tek kaynak — detay metnindeki ortalama pace'i oku
   let effectivePaceSec=blokPaceSec;
@@ -9913,7 +10147,27 @@ function adimToRowsFallback(adim, zones){
   const _rowClr=_gapColorZIdx!==undefined
     ?{color:ZONE_COLORS_INLINE[_gapColorZIdx]||color,textColor:ZONE_TEXT_COLOR[_gapColorZIdx]||textColor}
     :clrFromPace(effectivePaceSec);
-  rows.push({type:'single',label:tirLabel,..._rowClr,...csb,rpe,_isSprint:isSprintType,_origPaceSec:(csb.pm||0)*60+(csb.ps||0),_origZIdx:zIdx});
+  // KÖK NEDEN DÜZELTMESİ (14.09.2026 — Göksel'in bulduğu hata: MAF Test Koşusu
+  // satırında NABIZ sütunu 144 (MAF hedefi) yerine ~153 (genel Z2 bölge ortalaması)
+  // gösteriyordu): NABIZ önerisi normalde suggestedBpm() ile satırın zone'undaki
+  // lo_bpm/hi_bpm ortasından hesaplanır — ama MAF testinde asıl hedef "180−yaş"tan
+  // gelen ÖZEL bir değerdir, bu satırın genel Z2 bölgesiyle örtüşmeyebilir.
+  // mafNabizDetay() bu değeri zaten metne yazıyor ("MAF nabzı: 144 bpm ...");
+  // burada aynı sayı geri okunup satıra iliştiriliyor ki suggestedBpm() zone
+  // ortalaması yerine BU değeri önersin — metinde yazan ile önerilen HER ZAMAN
+  // aynı sayı olur, ayrı bir hesaplama tekrarlanmaz.
+  // NOT (15.09.2026): _mafRangeM aralık-regex'i, artık üretilmeyen eski
+  // "LTHR bazlı: X–Y bpm" biçimi için vardı (bkz. mafNabizDetay — LTHR
+  // alternatifi kaldırıldı). Zararsız/artık eşleşmeyen kod — dokunulmadı.
+  let _mafBpmOverride=null;
+  const _mafSingleM=detay.match(/MAF nabzı:\s*(\d+)\s*bpm/i);
+  if(_mafSingleM){
+    _mafBpmOverride=parseInt(_mafSingleM[1]);
+  } else {
+    const _mafRangeM=detay.match(/MAF nabzı[^:]*:\s*(\d+)[\u2013\-](\d+)\s*bpm/i);
+    if(_mafRangeM) _mafBpmOverride=Math.round((parseInt(_mafRangeM[1])+parseInt(_mafRangeM[2]))/2);
+  }
+  rows.push({type:'single',label:tirLabel,..._rowClr,...csb,rpe,_isSprint:isSprintType,_origPaceSec:(csb.pm||0)*60+(csb.ps||0),_origZIdx:zIdx,...(_mafBpmOverride!=null?{_sugBpmOverride:_mafBpmOverride}:{})});
   return rows;
 }
 
@@ -9992,7 +10246,7 @@ async function saveCueGlobal(label, text){
 }
 
 // Aralıklar editörü — tekrarlı antrenmanlarda her bir tekrarın koşu+dinlenme pace'lerini ayrı düzenler
-function AralikEditor({headerIdx, repCount, runRow, restRow, overrides, onChange, paceValidation, focusIndicator, paceToZoneIdx, liveRowColor, zones, measureZones, readOnly, isWorkoutLogged}){
+function AralikEditor({headerIdx, repCount, runRow, restRow, overrides, onChange, paceValidation, focusIndicator, paceToZoneIdx, liveRowColor, gapZoneColor, zones, measureZones, readOnly, isWorkoutLogged}){
   const [editKey, setEditKey] = React.useState(null); // 'rep:type:field'
   const e = React.createElement;
   // 2026.08.23 — KÖK NEDEN DÜZELTMESİ: ReceteTablosu'daki _mZones (measureZones||zones,
@@ -10259,7 +10513,8 @@ function AralikEditor({headerIdx, repCount, runRow, restRow, overrides, onChange
             // düzeltmesini hem de raceZoneFromPace→paceSecToZoneIdx kök neden
             // düzeltmesini otomatik miras alır, iki görünüm arasında sapma riski kalmaz.
             const _liveColorRun=liveRowColor?liveRowColor(runData):null;
-            out.push(e('tr',{key:`r${rep}`,style:{background:_liveColorRun?.color||runData.color,borderBottom:'1px solid rgba(0,0,0,.1)'}},
+            const _gapColorRun=gapZoneColor?gapZoneColor(runData):null;
+            out.push(e('tr',{key:`r${rep}`,style:{background:_gapColorRun?.color||_liveColorRun?.color||runData.color,borderBottom:'1px solid rgba(0,0,0,.1)'}},
               e('td',{style:{...cellSt,color:'#000'}},rep),
               e('td',{style:{...cellSt,textAlign:'left',color:'#000'}},
                 runData.label,
@@ -10314,7 +10569,8 @@ function AralikEditor({headerIdx, repCount, runRow, restRow, overrides, onChange
             const hasPaceEntryRest=overrides[rep]?.rest?.pm!=null||overrides[rep]?.rest?.ps!=null;
             const pvR = hasPaceEntryRest ? paceValidation(restData) : null;
             const _liveColorRest=liveRowColor?liveRowColor(restData):null; // bkz. run satırındaki aynı not
-            out.push(e('tr',{key:`d${rep}`,style:{background:_liveColorRest?.color||restData.color,borderBottom:'2px solid rgba(0,0,0,.15)'}},
+            const _gapColorRest=gapZoneColor?gapZoneColor(restData):null;
+            out.push(e('tr',{key:`d${rep}`,style:{background:_gapColorRest?.color||_liveColorRest?.color||restData.color,borderBottom:'2px solid rgba(0,0,0,.15)'}},
               e('td',{style:{...cellSt,color:'#000'}},''),
               e('td',{style:{...cellSt,textAlign:'left',color:'#000',fontStyle:'italic',fontSize:10}},
                 '↳ '+restData.label,
@@ -10974,6 +11230,12 @@ function ReceteTablosu({yapilar, zones, measureZones, isYuruyus, tip, savedOverr
 
   // Satır için zone'dan hesaplanan önerilen ortalama nabız (yukarı yuvarla)
   const suggestedBpm=(row)=>{
+    // KÖK NEDEN DÜZELTMESİ (14.09.2026): MAF gibi testlerde satırın kendi özel
+    // hedefi (adimToRowsFallback'te detay metninden okunan _sugBpmOverride —
+    // bkz. ~satır 9900 civarı) varsa, bu satırın genel zone ortalamasından HER
+    // ZAMAN önceliklidir — aksi halde MAF hedefi (ör. 180−yaş=144) yerine o
+    // satırın (Z2 gibi) genel bölge ortalaması (ör. ~153) önerilmiş olurdu.
+    if(row._sugBpmOverride!=null) return row._sugBpmOverride;
     const zi=row._origZIdx;
     if(zi==null) return null;
     const hr=_mZones?.hrZones?.[zi];
@@ -11156,6 +11418,30 @@ function ReceteTablosu({yapilar, zones, measureZones, isYuruyus, tip, savedOverr
       if(gap) return Math.round(rawSec/gap.factor);
     }
     return rawSec;
+  };
+
+  // ── GAP bölgesi rengi (Göksel talebi, 2026.09.14 — "her satırda D+ girildikten sonra
+  // hesaplanan GAP değerine göre reçetelerin renklendirilmesi gerekiyor") ─────────────
+  // liveRowColor İLE KASITLI OLARAK AYRI tutuldu: liveRowColor "pace hedefe uygun mu"
+  // (paceValidation'la aynı kaynak) sinyalidir ve bu yüzden hedefi olmayan satırları
+  // (sprint/RPE, walk, ısınma/soğuma, yarış/serbest) bilerek dışlar — o dışlamalar BU
+  // fonksiyon için anlamsız, çünkü burada "hedefe uygunluk" değil sadece "GAP-düzeltmeli
+  // pace hangi bölgeye denk geliyor" bilgisi aranıyor. Bu yüzden satır tipinden TAMAMEN
+  // bağımsız: SADECE geçerli bir D+ + mesafe (→ hesaplanabilir bir GAP) şartına bakar.
+  // D+ girilmemiş/eğim %0.5 altındaysa (calcGAP null) null döner — çağıran yer o zaman
+  // mevcut renk kaynağına (liveRowColor/statik .color) düşer, bu satırlarda davranış
+  // DEĞİŞMEZ.
+  const gapZoneColor=(row)=>{
+    if(!row||!(row.dp>0)||!(row.mesafe>0)||row._isGapRow) return null;
+    const rawSec=(row.pm||0)*60+(row.ps||0);
+    if(rawSec<=0) return null;
+    const distKmForGap=((row._dpIsSum?(row.repeatCount||1):1)*row.mesafe)/1000;
+    const gap=calcGAP(row.dp,distKmForGap,0);
+    if(!gap) return null;
+    const gapSec=Math.round(rawSec/gap.factor);
+    const zi=paceSecToZoneIdx(gapSec,_mZones||zones);
+    const c=ZONE_COLORS_INLINE[zi];
+    return c?{color:c,textColor:ZONE_TEXT_COLOR[zi]||null}:null;
   };
 
   const paceValidation=(row)=>{
@@ -12107,9 +12393,10 @@ function ReceteTablosu({yapilar, zones, measureZones, isYuruyus, tip, savedOverr
             // Aralıklar tablosu için bu header'ın altındaki run+rest satırlarını bul
             const runRow=rows[i+1];
             const restRow=(rows[i+2]&&(rows[i+2].type==='rest'||rows[i+2].type==='walk'))?rows[i+2]:null;
+            const _gapColorH=gapZoneColor(r);
             return React.createElement(React.Fragment,{key:'h'+i},
-              React.createElement('tr',{style:{background:r.color}},
-                React.createElement('td',{colSpan:colSpanN,style:{padding:'4px 8px',fontWeight:700,fontSize:11,color:r.textColor,letterSpacing:'.3px',display:'flex',alignItems:'center',gap:6}},
+              React.createElement('tr',{style:{background:_gapColorH?.color||r.color}},
+                React.createElement('td',{colSpan:colSpanN,style:{padding:'4px 8px',fontWeight:700,fontSize:11,color:_gapColorH?.textColor||r.textColor,letterSpacing:'.3px',display:'flex',alignItems:'center',gap:6}},
                   readOnly?repeatLabel:React.createElement(React.Fragment,null,
                     repeatLabel.split(/\d+/).shift(),
                     editingRepeat===i
@@ -12133,7 +12420,7 @@ function ReceteTablosu({yapilar, zones, measureZones, isYuruyus, tip, savedOverr
                     style:{
                       marginLeft:'auto',fontSize:10,padding:'2px 8px',
                       background:isAralikOpen?'#fbbf24':'rgba(255,255,255,0.1)',
-                      color:isAralikOpen?'#000':r.textColor,
+                      color:isAralikOpen?'#000':(_gapColorH?.textColor||r.textColor),
                       border:'1px solid '+(isAralikOpen?'#fbbf24':'rgba(255,255,255,0.3)'),
                       borderRadius:3,cursor:'pointer',fontWeight:700
                     }
@@ -12153,6 +12440,7 @@ function ReceteTablosu({yapilar, zones, measureZones, isYuruyus, tip, savedOverr
                     focusIndicator,
                     paceToZoneIdx,
                     liveRowColor,
+                    gapZoneColor,
                     zones,
                     measureZones,
                     readOnly,
@@ -12165,8 +12453,9 @@ function ReceteTablosu({yapilar, zones, measureZones, isYuruyus, tip, savedOverr
           const _showRange=paceTol>0&&!r.rpe&&!r._isSprint&&(r.pm>0||r.ps>0);
           const _rangeTxt=_showRange?(fmtPs(Math.max(120,(r.pm||0)*60+(r.ps||0)-paceTol))+' – '+fmtPs((r.pm||0)*60+(r.ps||0)+paceTol)):null;
           const _liveColor=liveRowColor(r);
+          const _gapColor=gapZoneColor(r);
           return React.createElement(React.Fragment,{key:i},
-          React.createElement('tr',{style:{background:_liveColor?.color||r.color,borderBottom:'1px solid rgba(0,0,0,.08)'}},
+          React.createElement('tr',{style:{background:_gapColor?.color||_liveColor?.color||r.color,borderBottom:'1px solid rgba(0,0,0,.08)'}},
             React.createElement('td',{style:{padding:'5px 6px',fontWeight:700,fontSize:11,color:'#000',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:6}},
               React.createElement('div',{style:{flex:1,minWidth:0}},
               r.label,
@@ -12314,8 +12603,12 @@ function ReceteTablosu({yapilar, zones, measureZones, isYuruyus, tip, savedOverr
                 const _hintIsWarmupCooldown=/[iı]sınma|isinma|soğuma|soguma/i.test(_hintLabel);
                 const isRecoveryRow=r.type==='rest'||(r.type==='walk'&&r.repeatCount>1&&!_hintIsWarmupCooldown);
                 const durSec=rowDurSec(r);
-                const isShortRow=!r.rpe&&!r._isSprint&&durSec>0&&durSec<=SHORT_ROW_MAX_SEC;
-                const bpmHint=isRecoveryRow?'min':(!r.rpe&&!r._isSprint&&r.type!=='header'&&durSec>0)
+                // KÖK NEDEN DÜZELTMESİ (bkz. gpxBuildLegPayload isShort notu, 2026.09.14):
+                // !r.rpe istisnası kaldırıldı — artık isShort/bpmValidation/bpmValidationAralik/
+                // aralık ipucuyla AYNI (sadece süre) kural. r._isSprint burada zaten satır
+                // 12349'daki early-return ile elenmiş durumda (bu noktaya hiç ulaşmaz).
+                const isShortRow=durSec>0&&durSec<=SHORT_ROW_MAX_SEC;
+                const bpmHint=isRecoveryRow?'min':(r.type!=='header'&&durSec>0)
                   ?(isShortRow?'tepe':'ort.')
                   :null;
                 return React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:0}},
@@ -13763,7 +14056,7 @@ function tplTempo(band, sure_dk, zones, phase='Gelişme', phaseStep=0, athWorkou
   // yoksa fallback); geçmiş varsa calcSeviyeFromHistory (bkz. tanım) belirler.
   const phaseBase={Temel:0,Gelişme:3,Zirve:6,Taper:0}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2}[phase]??7;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2,'Yarış Sonrası':2}[phase]??7;
   const sIdx=calcSeviyeFromHistory('tempo',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const cfg=TEMPO_PROG[sIdx];
   const seviye='S'+(sIdx+1);
@@ -13785,7 +14078,7 @@ function tplEsik(band, sure_dk, zones, phase='Gelişme', phaseStep=0, athWorkout
   // Progresyon: ESIK_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:8}[phase]??8;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:8,Taper:2,'Yarış Sonrası':2}[phase]??8;
   const sIdx=calcSeviyeFromHistory('esik',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const cfg=ESIK_PROG[sIdx];
   const seviye='S'+(sIdx+1);
@@ -13809,7 +14102,7 @@ function tplInterval(band, phase, zones, phaseStep=0, athWorkouts=_PLANDAY_ATH_W
   // Progresyon: INTERVAL_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:8}[phase]??8;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:8,Taper:2,'Yarış Sonrası':2}[phase]??8;
   const sIdx=calcSeviyeFromHistory('interval',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const ic=INTERVAL_PROG[sIdx];
   const seviye='S'+(sIdx+1);
@@ -13847,7 +14140,7 @@ function tplYokusKisa(band, zones, phase='Gelişme', phaseStep=0, athWorkouts=_P
   // Progresyon: YOKUS_KISA_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:7}[phase]??7;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2,'Yarış Sonrası':2}[phase]??7;
   const sIdx=calcSeviyeFromHistory('yokus_kisa',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const cfg=YOKUS_KISA_PROG[sIdx];
   const sure_dk=YOKUS_KISA_SURE[sIdx]||40;
@@ -13868,7 +14161,7 @@ function tplYokusUzun(band, zones, phase='Gelişme', phaseStep=0, athWorkouts=_P
   // Progresyon: YOKUS_UZUN_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:7}[phase]??7;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2,'Yarış Sonrası':2}[phase]??7;
   const sIdx=calcSeviyeFromHistory('yokus_uzun',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const cfg=YOKUS_UZUN_PROG[sIdx];
   const sure_dk=YOKUS_UZUN_SURE[sIdx]||45;
@@ -13912,7 +14205,7 @@ function tplPiramit(band, zones, phase='Gelişme', phaseStep=0, athWorkouts=_PLA
   // Progresyon: PIRAMIT_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:7}[phase]??7;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2,'Yarış Sonrası':2}[phase]??7;
   const sIdx=calcSeviyeFromHistory('piramit',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const cfg=PIRAMIT_PROG[sIdx];
   const seviyePir='S'+(sIdx+1);
@@ -13940,7 +14233,7 @@ function tplKesintisizPiramit(band, zones, phase='Gelişme', phaseStep=0, athWor
   // Progresyon: KESINTISIZ_PIRAMIT_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:7}[phase]??7;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2,'Yarış Sonrası':2}[phase]??7;
   const sIdx=calcSeviyeFromHistory('kesintisiz_piramit',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const cfg=KESINTISIZ_PIRAMIT_PROG[sIdx];
   const zResolved=[null,z2,z3,z4,z5a];
@@ -13967,7 +14260,7 @@ function tplCruise(band, sure_dk, zones, phase='Gelişme', phaseStep=0, athWorko
   // Progresyon: CRUISE_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:7}[phase]??7;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2,'Yarış Sonrası':2}[phase]??7;
   const sIdx=calcSeviyeFromHistory('cruise',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const cp=CRUISE_PROG[sIdx];
   const seviye='S'+(sIdx+1);
@@ -13996,7 +14289,7 @@ function tplProgressive(band, sure_dk, zones, phase='Gelişme', phaseStep=0, ath
   // Progresyon: PROGRESSIVE_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:7}[phase]??7;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2,'Yarış Sonrası':2}[phase]??7;
   const sIdx=calcSeviyeFromHistory('progressive',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const cfg=PROGRESSIVE_PROG[sIdx];
   const seviyeProg='S'+(sIdx+1);
@@ -14022,7 +14315,7 @@ function tplOnOff(band, zones, phase='Gelişme', phaseStep=0, athWorkouts=_PLAND
   // Progresyon: ON_OFF_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:6}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:7}[phase]??7;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:7,Taper:2,'Yarış Sonrası':2}[phase]??7;
   const sIdx=calcSeviyeFromHistory('on_off',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const oo=ON_OFF_PROG[sIdx];
   const seviye='S'+(sIdx+1);
@@ -14087,7 +14380,7 @@ function tplYarisTempo(band, sure_dk, zones, phase='Zirve', race=null, racePaceS
   // Progresyon: YARIS_TEMPO_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Taper:0,Gelişme:3,Zirve:5}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Taper:2,Gelişme:4,Zirve:6}[phase]??6;
+  const phaseMax={Taper:2,Gelişme:4,Zirve:6,Temel:2,'Yarış Sonrası':2}[phase]??6;
   const sIdx=calcSeviyeFromHistory('yaris_tempo',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const yt=YARIS_TEMPO_PROG[sIdx];
   const seviye='S'+(sIdx+1);
@@ -14122,7 +14415,7 @@ function tplHillSprint(band, zones, phase='Gelişme', phaseStep=0, race=null, at
   // Progresyon: HILL_SPRINT_PROG[sIdx] — bkz. calcSeviyeFromHistory tanımı
   const phaseBase={Temel:0,Gelişme:3,Zirve:5}[phase]||0;
   const bandOff=band<=2?0:band===3?1:2;
-  const phaseMax={Temel:2,Gelişme:5,Zirve:5}[phase]??5;
+  const phaseMax={Temel:2,Gelişme:5,Zirve:5,Taper:2,'Yarış Sonrası':2}[phase]??5;
   const sIdx=calcSeviyeFromHistory('hill_sprint',phaseMax,calcProgressionSIdx(phaseBase+bandOff,phaseStep,phaseMax),athWorkouts);
   const hs=HILL_SPRINT_PROG[sIdx];
   const seviye='S'+(sIdx+1);
@@ -19125,10 +19418,15 @@ function generateTwoWeekPlan(athlete, history, races, actualWorkouts, testPlanla
 // Firebase key: plan_snapshots/{athId}/{weekKey}
 // Snapshot: {weekKey, athId, generatedAt, lastReviewAt, overrideMap, reviewLog}
 
-function generatePlanSnapshot(athlete,history,races,workouts,testPlanlar,targetWeekKey=null,weekEffOverride=null){
+// optimizeMode (17.09.2026 — Göksel'in bildirimi): Eskiden burada optimize HER ZAMAN
+// false'tu ve çağıran taraf ham races gönderiyordu → "Planı Güncelle" Yükleme
+// Planı'ndaki Hedef seçimini (__force) ve Optimize modunu yok sayıp hep otomatik
+// ana yarışa göre (A öncelikli) reçete üretiyordu. Artık çağıran taraf seçili
+// hedefi (__force'lu races) ve modu iletir.
+function generatePlanSnapshot(athlete,history,races,workouts,testPlanlar,targetWeekKey=null,weekEffOverride=null,optimizeMode=false){
   const now=new Date();
   const todayStr=localDateStr(now);
-  const plan=generateTwoWeekPlan(athlete,history,races,workouts,testPlanlar||[],false,null,weekEffOverride);
+  const plan=generateTwoWeekPlan(athlete,history,races,workouts,testPlanlar||[],optimizeMode,null,weekEffOverride);
   const overrideMap={};
 
   const targetKey=targetWeekKey||getWeekKey(0);
@@ -19152,6 +19450,14 @@ function generatePlanSnapshot(athlete,history,races,workouts,testPlanlar,targetW
         sure_dk:day.sure_dk,yukHedef:day.yukHedef||0,
         dpHedef:day.dpHedef||0,
         isKosuCapraz:day.isKosuCapraz||false,
+        // KÖK NEDEN DÜZELTMESİ (15.09.2026 — Göksel bildirimi: "MAF testi
+        // onayladım, ❤️ ikonu geldi ama antrenman adı/reçetesi eskisi kaldı"):
+        // overrideMap'e isTest/testTur hiç yazılmıyordu. planDay testi bulduğunda
+        // günü koşulsuz isTest:true olarak üretiyor, ama bu değer overrideMap'e
+        // hiç kaydedilmediği için "Planı Güncelle" sonrası bile tekrar donuk
+        // (stale) override okunduğunda isTest kayboluyordu (bkz. plan useMemo,
+        // ~satır 20784/20814'teki eşleştirme düzeltmesi — panel paritesi).
+        isTest:day.isTest||false,testTur:day.testTur||null,
         approved:false,
         yapilar:(()=>{
           // generateTwoWeekPlan _rows eklemez — injectRowsFromTpl ile tüm yapilar dizisine
@@ -19370,7 +19676,7 @@ function buildEffectiveKosuYapilar(dayLike, kosuActual, zones, disiplin, athlete
     // Fallback 1: gerçekleşen koşunun kendi türünden (tur/yapi_notu) üret
     if(kosuActual){
       try{
-        const _tur=kosuActual.tur||kosuActual.spor||'aerobik';
+        const _tur=kosuSlotTur(kosuActual,dayLike?.tip);
         const _effTur=_KOSU_TIP_SET.has(_tur)?_tur:'aerobik';
         const _yapiNotu=kosuActual.yapi_notu||'';
         const _sureDk=Math.round((toSec(kosuActual.sure_sa,kosuActual.sure_dk,kosuActual.sure_sn)||0)/60)||dayLike?.sure_dk||45;
@@ -19405,7 +19711,7 @@ function buildEffectiveKosuYapilar(dayLike, kosuActual, zones, disiplin, athlete
       if(_ykTpl?.yapilar?.length>0) displayYapilar=_ykTpl.yapilar;
     }catch(e){}
   }
-  const _rawDisplayTip=kosuActual?(kosuActual.tur||kosuActual.spor||'aerobik'):(dayLike?.tip||'aerobik');
+  const _rawDisplayTip=kosuSlotTur(kosuActual,dayLike?.tip);
   let _displayTip=_KOSU_TIP_SET.has(_rawDisplayTip)?_rawDisplayTip:'aerobik';
   if(_ykM) _displayTip='yuru_kos'; // Yürü-Koş tespit edildiyse tip de tutarlı olsun (ReceteTablosu bölge/pace hesabı için)
   return{displayYapilar,displayTip:_displayTip};
@@ -19422,13 +19728,41 @@ function buildEffectiveKosuYapilar(dayLike, kosuActual, zones, disiplin, athlete
 //   kosuDone/caprazDone: ilgili kategoride kayıt var mı
 //   fullyCompleted: kart üst rozetinin TAMAMLANDI/✔ alma şartı
 //   kosuFirst: render sırası — true=koşu üstte, false=çapraz üstte (tamamlanan üste)
+// 2026.09.16 — KÖK NEDEN DÜZELTMESİ (Göksel talebi): plan tipi yürüyüş türünde
+// (power_hiking/tempolu_yurume/rahat_yurume/yuru_kos veya başlıkta "Yürü-Koş") olan bir
+// günde sporcu antrenmanı spor='yuruyus' olarak kaydettiğinde, kayıt çapraz sayılıyor ve
+// koşu slotu "🏃 Koşu ❌ Yapılmadı" gösteriyordu. Bu tür planlarda yürüyüş kaydı, planın
+// kendisidir → koşu slotuna sayılır. Koşu tipli planlarda (tempo, interval vb.) yürüyüş
+// koşunun yerine GEÇMEZ (mevcut kural korunur). Haftalık km gibi koşuya özel toplamlar
+// bu yardımcıyı KULLANMAZ — yalnızca gün kartı/slot eşleştirmesi içindir.
+const _YURUYUS_PLAN_TIP_SET=new Set(['power_hiking','tempolu_yurume','rahat_yurume','yuru_kos']);
+function isYuruyusPlan(ov){
+  if(!ov) return false;
+  if(_YURUYUS_PLAN_TIP_SET.has(ov.tip)) return true;
+  const src=(ov.baslik||'')+' '+(ov.yapi_notu||'');
+  return /Yürü-Koş/i.test(src);
+}
+function isKosuSlotWorkout(w, ov){
+  const sp=w?.spor||'kosu';
+  if(sp==='kosu') return true;
+  return sp==='yuruyus'&&isYuruyusPlan(ov);
+}
+// Koşu slotundaki gerçek kaydın antrenman türü. Yürüyüş kayıtlarında tur alanı
+// genelde boştur; spor='yuruyus' reçete tipi olmadığı için 'aerobik'e düşüp yürüyüşü
+// koşu bölgelerine göre ("Çok Yavaş") değerlendiriyordu → plan tipine düşülür.
+function kosuSlotTur(a, planTip){
+  if(!a) return planTip||'aerobik';
+  if(a.tur) return a.tur;
+  if((a.spor||'kosu')==='yuruyus') return planTip||'aerobik';
+  return a.spor||'aerobik';
+}
 function splitDayActivities(ov, actuals){
   const isKosuCapraz=!!ov?.isKosuCapraz;
   const isCaprazOnly=ov?.tip==='capraz';
   const isRest=!ov||ov.tip==='dinlenme';
   const isRace=ov?.tip==='yaris';
-  const kosuActuals=(actuals||[]).filter(w=>(w.spor||'kosu')==='kosu');
-  const caprazActuals=(actuals||[]).filter(w=>(w.spor||'kosu')!=='kosu');
+  const kosuActuals=(actuals||[]).filter(w=>isKosuSlotWorkout(w,ov));
+  const caprazActuals=(actuals||[]).filter(w=>!isKosuSlotWorkout(w,ov));
   const kosuDone=kosuActuals.length>0;
   const caprazDone=caprazActuals.length>0;
   // Tamamlanma kararı (tick için):
@@ -20307,7 +20641,7 @@ function PickDebugInfo({debug}){
   );
 }
 
-function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapInit,onPlanSnapChange,onAthletesRefresh,onWorkoutsRefresh,onSaveWorkout,onUpdateWorkout,onUpdateAthlete,onSaveTestPlan}){  const [showLoading,setShowLoading]=useState(false);
+function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapInit,onPlanSnapChange,onAthletesRefresh,onWorkoutsRefresh,onSaveWorkout,onUpdateWorkout,onUpdateAthlete,onSaveTestPlan,onDeleteTestPlan}){  const [showLoading,setShowLoading]=useState(false);
   const [selectedPrimary,setSelectedPrimary]=useState(null);
   const [planMode,setPlanModeLocal]=useState('optimize');
   const [expandDay,setExpandDay]=useState(null);
@@ -20569,7 +20903,10 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
                 _ovTip==='dinlenme'||_ovTip==='yaris'||
                 (_ovTip==='capraz'&&_curCapraz.includes(_dayShortPast))||
                 (_ovTip!=='dinlenme'&&_ovTip!=='yaris'&&_ovTip!=='capraz'&&_curKosu.includes(_dayShortPast));
-              if(_isStillOk) return{...day,yapilar:ov.yapilar,tip:ov.tip||day.tip,baslik:ov.baslik||day.baslik,yapi_notu:('yapi_notu' in ov)?ov.yapi_notu:(day.yapi_notu||'')};
+              // Panel paritesi/aynı kök neden düzeltmesi — tip/baslik/yapilar override'dan
+              // alınırken isTest/testTur da AYNI kaynaktan (ov) gelmeli; aksi halde
+              // isTest ham (taze) day'den miras kalıp yanlış ikon gösterebilir.
+              if(_isStillOk) return{...day,yapilar:ov.yapilar,tip:ov.tip||day.tip,baslik:ov.baslik||day.baslik,yapi_notu:('yapi_notu' in ov)?ov.yapi_notu:(day.yapi_notu||''),isTest:ov.isTest||false,testTur:ov.testTur||null};
             }
             return day;
           }
@@ -20603,12 +20940,14 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
               const _ovStillOkToday=!ov||_isManualToday||athActualDates.has(day.date)||_ovTipToday==='dinlenme'||_ovTipToday==='yaris'||
                 (_ovTipToday==='capraz'&&_curCaprazToday.includes(_dayShortToday))||
                 (_ovTipToday!=='dinlenme'&&_ovTipToday!=='yaris'&&_ovTipToday!=='capraz'&&_curKosuToday.includes(_dayShortToday));
-              if(_ovStillOkToday&&ov?.yapilar?.length>0) return{...day,yapilar:ov.yapilar,tip:ov.tip||day.tip,baslik:ov.baslik||day.baslik,yapi_notu:('yapi_notu' in ov)?ov.yapi_notu:(day.yapi_notu||'')};
+              if(_ovStillOkToday&&ov?.yapilar?.length>0) return{...day,yapilar:ov.yapilar,tip:ov.tip||day.tip,baslik:ov.baslik||day.baslik,yapi_notu:('yapi_notu' in ov)?ov.yapi_notu:(day.yapi_notu||''),isTest:ov.isTest||false,testTur:ov.testTur||null};
               // İkinci güvenlik katmanı — gelecek dalındaki "Manuel atama" fallback'iyle AYNI
               // desen (bkz. aşağıda satır ~14222): ov her nedense yapılarsız/geçersizse bile
-              // manualOverrides'taki tip/baslik'i sessizce yoksayma.
+              // manualOverrides'taki tip/baslik'i sessizce yoksayma. Manuel atama her zaman
+              // testi geçersiz kılar (bkz. handleManuelAta'nın onDeleteTestPlan çağrısı) —
+              // isTest burada da açıkça false yapılır, ham day'den miras kalmaz.
               const _moToday=_isManualToday?manualOvMap[day.date]:null;
-              if(_moToday?.tip) return{...day,tip:_moToday.tip,baslik:_moToday.baslik||day.baslik};
+              if(_moToday?.tip) return{...day,tip:_moToday.tip,baslik:_moToday.baslik||day.baslik,isTest:false,testTur:null};
               return day;
             }
             // Bugün antrenman kaydı yok — koşu günüyse taze plan öncelikli kontrol
@@ -20624,7 +20963,14 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
               if(day.tip==='yaris') return day;
               if(ovToday&&ovToday.tip!=='dinlenme'&&(ovToday.yapilar||[]).length>0){
                 // overrideMap'te geçerli antrenman var → kullan
-                return{...day,tip:ovToday.tip,baslik:ovToday.baslik,yapi_notu:('yapi_notu' in ovToday)?ovToday.yapi_notu:(day.yapi_notu||''),sure_dk:ovToday.sure_dk,yukHedef:ovToday.yukHedef,isKosuCapraz:ovToday.isKosuCapraz||false,yapilar:ovToday.yapilar||[]};
+                // KÖK NEDEN DÜZELTMESİ (15.09.2026): isTest/testTur burada ovToday'den
+                // AÇIKÇA alınmalı — aksi halde spread edilen ham '...day' üzerinden
+                // (bu render'ın CANLI testPlanlar hesabından) isTest:true miras kalır,
+                // ama tip/baslik/yapilar hâlâ ovToday'in DONMUŞ (test planlanmadan
+                // ÖNCEKİ) haliyle gösterilir → ❤️ ikonu çıkar ama isim/reçete/süre
+                // eskisi kalır (Göksel'in bildirdiği tam senaryo: test onaylandı ama
+                // "Planı Güncelle" henüz basılmadı).
+                return{...day,tip:ovToday.tip,baslik:ovToday.baslik,yapi_notu:('yapi_notu' in ovToday)?ovToday.yapi_notu:(day.yapi_notu||''),sure_dk:ovToday.sure_dk,yukHedef:ovToday.yukHedef,isKosuCapraz:ovToday.isKosuCapraz||false,yapilar:ovToday.yapilar||[],isTest:ovToday.isTest||false,testTur:ovToday.testTur||null};
               }
               // overrideMap yok / dinlenme / boş yapilar → taze plana bak
               if(day.tip&&day.tip!=='dinlenme'&&(day.yapilar||[]).length>0){
@@ -20654,11 +21000,13 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
             if(isAntrenmanGunu&&!isManual&&(ov.tip==='dinlenme'||ovYapilarBos)&&day.tip&&day.tip!=='dinlenme'&&day.yapilar?.length>0){
               return day; // taze generateTwoWeekPlan önerisi
             }
-            return{...day,tip:ov.tip,baslik:ov.baslik,yapi_notu:('yapi_notu' in ov)?ov.yapi_notu:(day.yapi_notu||''),sure_dk:ov.sure_dk,yukHedef:ov.yukHedef,isKosuCapraz:ov.isKosuCapraz||false,yapilar:ov.yapilar||[]};
+            // Aynı kök neden düzeltmesi (bkz. yukarıdaki "bugün" dalı notu) — gelecek
+            // günler için de isTest/testTur ov'dan açıkça alınır, ham day'den miras kalmaz.
+            return{...day,tip:ov.tip,baslik:ov.baslik,yapi_notu:('yapi_notu' in ov)?ov.yapi_notu:(day.yapi_notu||''),sure_dk:ov.sure_dk,yukHedef:ov.yukHedef,isKosuCapraz:ov.isKosuCapraz||false,yapilar:ov.yapilar||[],isTest:ov.isTest||false,testTur:ov.testTur||null};
           }
-          // Manuel atama
+          // Manuel atama — testi geçersiz kılar (bkz. handleManuelAta/onDeleteTestPlan)
           const mo=manualDates.has(day.date)?manualOvMap[day.date]:null;
-          if(mo?.tip) return{...day,tip:mo.tip,baslik:mo.baslik||day.baslik};
+          if(mo?.tip) return{...day,tip:mo.tip,baslik:mo.baslik||day.baslik,isTest:false,testTur:null};
           // Güvenlik katmanı: override yok, manuel atama yok — gün artık koşu/çapraz günü
           // değilse ve gerçek antrenman yoksa ham generated planı değil dinlenmeyi döndür.
           // Bu, approved koruma veya fbGet race condition sonucu oluşabilecek yanlış gösterimi engeller.
@@ -21053,7 +21401,9 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
     const newRotOffset=((curSnap.rotOffset||0)+1)%97;
     freshAthlete={...freshAthlete,_planRotOffset:newRotOffset};
 
-    const newSnap=generatePlanSnapshot(freshAthlete,history,races,freshWorkouts,testPlanlar||[],null,curSnap.weekEff||null);
+    // Seçili hedef yarış + Optimize modu — Yükleme Planı ve manuel atama ile AYNI girdi
+    const racesForSnap=selectedPrimary?races.map(r=>({...r,__force:r.id===selectedPrimary})):races;
+    const newSnap=generatePlanSnapshot(freshAthlete,history,racesForSnap,freshWorkouts,testPlanlar||[],null,curSnap.weekEff||null,planMode==='optimize');
     newSnap.rotOffset=newRotOffset;
     newSnap.planMode=planMode;
     newSnap.selectedPrimary=selectedPrimary||null;
@@ -21351,6 +21701,23 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
       const _confirmMsg=dateStr+' için tamamlanmış bir antrenman kaydı ve satır bazlı düzenlemeler (mesafe/pace/nabız) var.\n\nYeni bir antrenman atamak bu düzenlemeleri SİLECEK ve tabloyu şablon hedef değerlerine döndürecektir.\n\nDevam edilsin mi?';
       if(!confirm(_confirmMsg)) return;
     }
+    // KÖK NEDEN DÜZELTMESİ (14.09.2026 — Göksel'in bulduğu hata: "MAF testi
+    // önerisini onayladım, sonra yerine başka antrenman atadım ama ❤️ ikonu
+    // hala duruyor"): bu tarih için onaylanmış/bekleyen bir test planı
+    // (testPlanlar) varsa, manuel Ata bunu HİÇ silmiyordu. planDay (~satır
+    // 17288) her render'da testPlanlar'da o tarihe eşleşme bulduğu sürece
+    // günü koşulsuz isTest:true+testTur olarak işaretliyor; override-birleştirme
+    // (~satır 20606/20627/20657) da sadece tip/baslik/yapilar gibi alanları
+    // override'dan alıp isTest/testTur'u ham günden miras bırakıyor — bu yüzden
+    // yeni antrenman görünürde atanmış olsa da ikon (dayEmoji, isTest'e bakıyor)
+    // eski testin ikonunu göstermeye devam ediyordu. DAHA KÖTÜSÜ: testPlanlar
+    // silinmediği için bir sonraki "Planı Güncelle" bu tarihi sessizce yeniden
+    // teste çevirip koçun az önce yaptığı manuel atamayı geçersiz kılabiliyordu.
+    // Düzeltme: manuel atama bu tarihteki bekleyen test planını/planlarını iptal
+    // eder (siler) — güvenlik amaçlı bir maskeleme değil, verinin kendisi düzeltiliyor.
+    if(onDeleteTestPlan){
+      (testPlanlar||[]).filter(p=>p.athId===athlete.id&&p.date===dateStr).forEach(p=>onDeleteTestPlan(p.id));
+    }
     // ── Dinlenme: sistemdeki standart dinlenme temsiliyle BİREBİR aynı şekilde kaydet ──
     // Aşağıdaki genel şablon akışı (sure_dk||50 fallback'i, tip'e göre yükHedef çarpanı vb.)
     // dinlenme için uygun değil: sure_dk:0 falsy olduğundan ||50 devreye girip 50 dk gibi
@@ -21510,6 +21877,10 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
             yukHedef:freshDay.yukHedef||0,
             isKosuCapraz:freshDay.isKosuCapraz||false,
             yapilar:freshDay.yapilar,
+            // isTest/testTur de taze günden yazılmalı — aksi halde bu onay kutusu
+            // yazımı overrideMap'te isTest'i sessizce siler (bkz. generatePlanSnapshot
+            // ve plan useMemo'daki 15.09.2026 kök neden düzeltmesi).
+            isTest:freshDay.isTest||false,testTur:freshDay.testTur||null,
             approved:false // henüz onaylanmadı; aşağıda toggle edilecek
           };
         }
@@ -21942,7 +22313,7 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
               },
               style:{fontSize:12,padding:'4px 8px',border:'1px solid var(--border)',borderRadius:'var(--radius)',background:'var(--bg-primary)',color:'var(--text-primary)'}
             },
-              React.createElement('option',{value:''},'Otomatik (en zor)'),
+              React.createElement('option',{value:''},'Otomatik (A/B önceliği → en zor)'),
               upcomingRaces.map(r=>React.createElement('option',{key:r.id,value:r.id},r.ad+' — '+fmtDate(r.tarih)))
             ),
             selectedPrimary&&React.createElement('span',{style:{fontSize:11,color:'var(--warn)'},title:'Otomatik seçimden farklı'},'⚠ Manuel seçim')
@@ -23397,7 +23768,7 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
                       // günün rowOverrides alt-yoluna yaz — kardeş tarihlere veya başka herhangi
                       // bir üst-seviye alana (weekEff, rampModeOn, formSnap vb.) asla dokunmaz.
                       fbUpdate(`plan_snapshots/${athlete.id}/${weekKey}`,_multiUpdate).catch(()=>{});
-                      if((_zd||_gd)&&onUpdateWorkout){const mw=workouts.find(w=>w.date===day.date&&w.athleteId===athlete?.id&&(w.spor||'kosu')==='kosu');if(mw)onUpdateWorkout(mw.id,{...(_zd?{_rowZoneDist:_zd}:{}),...(_gd?{_rowGapData:_gd}:{})});}
+                      if((_zd||_gd)&&onUpdateWorkout){const mw=workouts.find(w=>w.date===day.date&&w.athleteId===athlete?.id&&isKosuSlotWorkout(w,day));if(mw)onUpdateWorkout(mw.id,{...(_zd?{_rowZoneDist:_zd}:{}),...(_gd?{_rowGapData:_gd}:{})});}
                     },
                     onSaveDetay: async (label, text, rowUpdate, rowLabel)=>{
                       const _lastSavedAt=new Date().toISOString();
@@ -23859,7 +24230,7 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
                   // KÖK NEDEN DÜZELTMESİ (18.07.2026) — bkz. gün kartındaki aynı not:
                   // bu "Paylaş" kartı da SADECE plan tipine bakıyordu; plan dışı gerçekleşen
                   // koşu varsa ReceteTablosu hiç render edilmiyordu.
-                  const _kosuActualH=(day.actual||[]).find(w=>(w.spor||'kosu')==='kosu')||null;
+                  const _kosuActualH=(day.actual||[]).find(w=>isKosuSlotWorkout(w,day))||null;
                   const _showKosuH=_KOSU_TIP_SET.has(day.tip)||day.isKosuCapraz===true||!!_kosuActualH;
                   if(!_showKosuH) return null;
                   const _kosuGorunumH=buildEffectiveKosuYapilar(day,_kosuActualH,calcZones(athlete),athlete?.disiplin,athlete);
@@ -23873,7 +24244,7 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
                     isWorkoutLogged:!!_kosuActualH,
                     savedOverrides:(planSnap?.rowOverrides||{})[day.date],
                     savedCuePatches:(planSnap?.overrideMap?.[day.date]?._cuePatch)||{},
-                    actualOrtNabiz:day.actual?.find(w=>(w.spor||'kosu')==='kosu'&&parseFloat(w.ort_nabiz)>0)?.ort_nabiz||null,
+                    actualOrtNabiz:day.actual?.find(w=>isKosuSlotWorkout(w,day)&&parseFloat(w.ort_nabiz)>0)?.ort_nabiz||null,
                     onSaveOverrides: async (overrides, detaySync)=>{
                     const {__zoneDist:_zd,__gapData:_gd,...cleanOverrides}=overrides;
                     const curSnap=planSnapRef.current||{};
@@ -23899,7 +24270,7 @@ function HaftalikPlanTab({athlete,history,races,workouts,testPlanlar,planSnapIni
                     // Bkz. yukarıdaki "Haftalık Reçete" panelindeki aynı not — sadece bu günün
                     // rowOverrides alt-yoluna yaz, kayıp güncelleme (lost update) yarışını önler.
                     fbUpdate(`plan_snapshots/${athlete.id}/${weekKey}`,_multiUpdate).catch(()=>{});
-                    if((_zd||_gd)&&onUpdateWorkout){const mw=workouts.find(w=>w.date===day.date&&w.athleteId===athlete?.id&&(w.spor||'kosu')==='kosu');if(mw)onUpdateWorkout(mw.id,{...(_zd?{_rowZoneDist:_zd}:{}),...(_gd?{_rowGapData:_gd}:{})});}
+                    if((_zd||_gd)&&onUpdateWorkout){const mw=workouts.find(w=>w.date===day.date&&w.athleteId===athlete?.id&&isKosuSlotWorkout(w,day));if(mw)onUpdateWorkout(mw.id,{...(_zd?{_rowZoneDist:_zd}:{}),...(_gd?{_rowGapData:_gd}:{})});}
                   },
                   onSaveDetay: async (label, text, rowUpdate, rowLabel)=>{
                   const _lastSavedAt=new Date().toISOString();
@@ -24317,7 +24688,9 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
     // hesaplandı) — 1450 rahat pay bırakıyor. Bu SADECE viewBox'ın iç oranı;
     // gerçek render genişliği yine width:'100%' ile tablonunkiyle aynı kalıyor,
     // sadece ölçek faktörü küçülüyor (metin/bant oranı sabit kalır).
-    const W=1480,H=180,padLeft=15,padRight=15,padTop=58,bandH=60,padBottom=62;
+    // padBottom 62→110 (2026.09.16, Göksel talebi: her sınır etiketine PACE de eklendi —
+    // ikinci satır için ek dikey yer).
+    const W=1480,H=228,padLeft=15,padRight=15,padTop=58,bandH=60,padBottom=110;
     const plotW=W-padLeft-padRight;
     const rangeLo=HR_ZONES_LTHR[0].lo*100;                         // 65
     const rangeHi=HR_ZONES_LTHR[HR_ZONES_LTHR.length-1].hi*100;    // 115
@@ -24357,19 +24730,37 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
     });
 
     const boundaryEls=[];
+    // Pace — aynı sınırın PACE bölge sistemindeki (farklı %VLT eşiğiyle bağımsız hesaplanan,
+    // ama AYNI zon ID'sine karşılık gelen) sınırı; bkz. calcZones→paceZones (2026.09.16,
+    // Göksel talebi: "85%·141" etiketinin yanına pace de eklensin).
+    const pz=zones.paceZones;
     // Sabit dış sınırlar (Z1'in altı=%65, Z5c'nin üstü=%115) — HR_ZONES_LTHR yorumundaki
     // gibi bunlar HİÇBİR ZAMAN kalibre edilmez (Sınır Kalibrasyonu yalnızca 6 İÇ sınırı
     // hedefler), bu yüzden jenerik/güncel ayrımı yok — tek bir sabit çizgi+etiket yeterli.
     // Göksel'in "Z1'in alt sınırı görünmüyor" geri bildirimi üzerine eklendi.
-    [{pct:rangeLo,bpm:zones.hrZones[0].lo_bpm},{pct:rangeHi,bpm:zones.hrZones[zones.hrZones.length-1].hi_bpm}].forEach((b,oi)=>{
+    [{pct:rangeLo,bpm:zones.hrZones[0].lo_bpm,pace:pz?pz[0].lo_pace:null},
+     {pct:rangeHi,bpm:zones.hrZones[zones.hrZones.length-1].hi_bpm,pace:pz?pz[pz.length-1].hi_pace:null}
+    ].forEach((b,oi)=>{
       const x=xFor(b.pct);
+      const lx=x+(oi===0?4:-4), ly=padTop+bandH+8;
       boundaryEls.push(React.createElement('line',{
         key:'outer'+oi,x1:x,x2:x,y1:padTop,y2:padTop+bandH,stroke:'#fff',strokeWidth:1.5,opacity:0.9,...nonScale
       }));
       boundaryEls.push(React.createElement('text',{
-        key:'outerlbl'+oi,x:x+(oi===0?4:-4),y:padTop+bandH+8,fontSize:FS,fontFamily:'monospace',fill:'var(--text-secondary)',
-        textAnchor:'start',transform:'rotate(90 '+(x+(oi===0?4:-4))+' '+(padTop+bandH+8)+')'
+        key:'outerlbl'+oi,x:lx,y:ly,fontSize:FS,fontFamily:'monospace',fill:'var(--text-secondary)',
+        textAnchor:'start',transform:'rotate(90 '+lx+' '+ly+')'
       },round1(b.pct)+'%·'+b.bpm));
+      // İkinci satır (pace): local +y (satır atlama) ekseninde, local +x DEĞİL — x'i
+      // kaydırmak metni AYNI döndürülmüş satırın devamı yapıyordu ("86.5%·149 6:32" tek
+      // satıra birleşme hatası, 2026.09.16 — Göksel'in ikinci geri bildirimi). rotate(90)
+      // altında local +y → ekranda gerçekten "alt satır" gibi okunan paralel bir sütun.
+      if(hasPace&&b.pace){
+        const lineHeight=FS+2;
+        boundaryEls.push(React.createElement('text',{
+          key:'outerlblpace'+oi,x:lx,y:ly+lineHeight,fontSize:FS,fontFamily:'monospace',fill:'var(--text-tertiary)',
+          textAnchor:'start',transform:'rotate(90 '+lx+' '+ly+')'
+        },b.pace));
+      }
     });
     HR_BOUNDARY_KEYS.forEach((k,i)=>{
       const genericPct=HR_BOUNDARY_BASE_PCT[k]*100;
@@ -24387,11 +24778,19 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
         key:'cur'+k,x1:xCur,x2:xCur,y1:padTop,y2:padTop+bandH,stroke:'#fff',strokeWidth:1.5,opacity:0.9,...nonScale
       }));
       // Etiket bandın ALTINDA, 90° döndürülmüş (yakın sınırlar — ör. Z5a/Z5b 3 puan —
-      // yatay metinle çakışırdı; dikey yazı yalnızca ~10px yatay yer kaplar).
+      // yatay metinle çakışırdı; dikey yazı yalnızca ~10px yatay yer kaplar). İkinci satır
+      // (pace) local +y (satır atlama) ekseninde — local +x kaydırmak, metni AYNI
+      // döndürülmüş satırın devamı yapıp tek satıra birleştiriyordu (2026.09.16, Göksel'in
+      // ikinci geri bildirimi: "86.5%·149 6:32" — alt alta değil, birleşik görünüyordu).
+      const curPx=xCur+4, curPy=padTop+bandH+8, curLineH=FS+2;
       boundaryEls.push(React.createElement('text',{
-        key:'curlbl'+k,x:xCur+4,y:padTop+bandH+8,fontSize:FS,fontFamily:'monospace',fill:'var(--text-secondary)',
-        textAnchor:'start',transform:'rotate(90 '+(xCur+4)+' '+(padTop+bandH+8)+')'
+        key:'curlbl'+k,x:curPx,y:curPy,fontSize:FS,fontFamily:'monospace',fill:'var(--text-secondary)',
+        textAnchor:'start',transform:'rotate(90 '+curPx+' '+curPy+')'
       },round1(curPct)+'%·'+curBpm));
+      if(hasPace&&pz?.[i]?.hi_pace)boundaryEls.push(React.createElement('text',{
+        key:'curlblpace'+k,x:curPx,y:curPy+curLineH,fontSize:FS,fontFamily:'monospace',fill:'var(--text-tertiary)',
+        textAnchor:'start',transform:'rotate(90 '+curPx+' '+curPy+')'
+      },pz[i].hi_pace));
 
       const change=preview?.changeLog?.find(c=>c.key===k);
       if(change){
@@ -24422,13 +24821,13 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
         ...boundaryEls
       ),
       React.createElement('div',{style:{display:'flex',gap:16,flexWrap:'wrap',fontSize:10,color:'var(--text-tertiary)',marginTop:6}},
-        React.createElement('span',null,'┄ jenerik taban'),
+        React.createElement('span',null,'┄ standart taban'),
         React.createElement('span',null,'▬ güncel (son) sınır'),
         preview&&React.createElement('span',{style:{color:'var(--info)'}},'┅ olası yeni sınır (bekliyor)')
       ),
       // Jenerik şablonun kaynağı (Göksel'in "hangi modele göre tasarlandı" sorusu üzerine)
       React.createElement('div',{style:{fontSize:10,color:'var(--text-tertiary)',marginTop:6,lineHeight:1.5}},
-        'Jenerik taban: Joe Friel\'in "Training Bible" %LTHR bölge modeli — 7 bölge, LTHR\'ye (eşik nabzı) oranla tanımlı (Z1 %65–85 · Z2 %85–89 · Z3 %89–94 · Z4 %94–100 · Z5a %100–103 · Z5b %103–106 · Z5c %106–115). Sınır Kalibrasyonu bu 6 iç sınırı sporcuya özel kaydırır; %65 ve %115 dış sınırları sabit kalır.'
+        'Standart taban: Joe Friel\'in "Training Bible" %LTHR bölge modeli — 7 bölge, LTHR\'ye (eşik nabzı) oranla tanımlı (Z1 %65–85 · Z2 %85–89 · Z3 %89–94 · Z4 %94–100 · Z5a %100–103 · Z5b %103–106 · Z5c %106–115). Sınır Kalibrasyonu bu 6 iç sınırı sporcuya özel kaydırır; %65 ve %115 dış sınırları sabit kalır.'
       )
     );
   };
@@ -24444,7 +24843,7 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
   const renderGenericBaselineRuler=()=>{
     if(!hasHR||zones.hrZones[0]?.method!=='%LTHR') return null;
     const lthr=zones.lthr;
-    const W=1480,H=180,padLeft=15,padRight=15,padTop=58,bandH=60,padBottom=62;
+    const W=1480,H=228,padLeft=15,padRight=15,padTop=58,bandH=60,padBottom=110;
     const plotW=W-padLeft-padRight;
     const rangeLo=HR_ZONES_LTHR[0].lo*100;
     const rangeHi=HR_ZONES_LTHR[HR_ZONES_LTHR.length-1].hi*100;
@@ -24475,17 +24874,27 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
 
     const boundaryPcts=[rangeLo,...HR_BOUNDARY_KEYS.map(k=>HR_BOUNDARY_BASE_PCT[k]*100),rangeHi];
     const boundaryEls=[];
+    // Pace — bkz. renderBoundaryRuler'daki AYNI not (calcZones→paceZones, aynı zon ID'sine
+    // karşılık gelen sınır; pace zonları kalibre edilmediğinden bu değer güncel cetvelle
+    // her zaman birebir aynıdır).
+    const pz=zones.paceZones;
     boundaryPcts.forEach((pct,bi)=>{
       const x=xFor(pct);
       const bpm=Math.round(lthr*pct/100);
       const lblDx=bi===boundaryPcts.length-1?-4:4;
+      const lx=x+lblDx, ly=padTop+bandH+8, lineH=FS+2;
+      const pace=pz?(bi===0?pz[0].lo_pace:pz[bi-1].hi_pace):null;
       boundaryEls.push(React.createElement('line',{
         key:'gcur'+bi,x1:x,x2:x,y1:padTop,y2:padTop+bandH,stroke:'#fff',strokeWidth:1.5,opacity:0.9,...nonScale
       }));
       boundaryEls.push(React.createElement('text',{
-        key:'gcurlbl'+bi,x:x+lblDx,y:padTop+bandH+8,fontSize:FS,fontFamily:'monospace',fill:'var(--text-secondary)',
-        textAnchor:'start',transform:'rotate(90 '+(x+lblDx)+' '+(padTop+bandH+8)+')'
+        key:'gcurlbl'+bi,x:lx,y:ly,fontSize:FS,fontFamily:'monospace',fill:'var(--text-secondary)',
+        textAnchor:'start',transform:'rotate(90 '+lx+' '+ly+')'
       },round1(pct)+'%·'+bpm));
+      if(hasPace&&pace)boundaryEls.push(React.createElement('text',{
+        key:'gcurlblpace'+bi,x:lx,y:ly+lineH,fontSize:FS,fontFamily:'monospace',fill:'var(--text-tertiary)',
+        textAnchor:'start',transform:'rotate(90 '+lx+' '+ly+')'
+      },pace));
     });
 
     // Sınır Kalibrasyonu şu ana kadar herhangi bir sınırı jenerikten kaydırmış mı?
@@ -24493,7 +24902,7 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
     const anyDrift=HR_BOUNDARY_KEYS.some(k=>Math.abs(parseSayi(athlete[HR_BOUNDARY_FIELD[k]])||0)>0.01);
 
     return React.createElement('div',{style:{marginTop:16}},
-      React.createElement('div',{style:{fontSize:11,fontWeight:600,color:'var(--text-secondary)',marginBottom:6}},'Jenerik Taban Cetveli'),
+      React.createElement('div',{style:{fontSize:11,fontWeight:600,color:'var(--text-secondary)',marginBottom:6}},'Standart Taban Cetveli'),
       React.createElement('svg',{width:'100%',viewBox:'0 0 '+W+' '+H,style:{display:'block'}},
         ...bandEls,
         React.createElement('rect',{x:padLeft,y:padTop,width:plotW,height:bandH,fill:'none',stroke:'var(--border)',strokeWidth:1,...nonScale}),
@@ -24501,8 +24910,8 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
       ),
       React.createElement('div',{style:{fontSize:10,color:'var(--text-tertiary)',marginTop:6,lineHeight:1.5}},
         anyDrift
-          ?'Bu cetvel her zaman jenerik (kalibrasyonsuz) şablonu gösterir — yukarıdaki Bölge Renk Haritası ile arasındaki fark, Sınır Kalibrasyonu\'nun bugüne kadar uyguladığı kaymadır.'
-          :'Bu cetvel her zaman jenerik (kalibrasyonsuz) şablonu gösterir. Sınır Kalibrasyonu henüz hiçbir sınırı kaydırmadı — bu yüzden şu an yukarıdaki Bölge Renk Haritası ile birebir aynı.'
+          ?'Bu cetvel her zaman standart (kalibrasyonsuz) şablonu gösterir — yukarıdaki Bölge Renk Haritası ile arasındaki fark, Sınır Kalibrasyonu\'nun bugüne kadar uyguladığı kaymadır.'
+          :'Bu cetvel her zaman standart (kalibrasyonsuz) şablonu gösterir. Sınır Kalibrasyonu henüz hiçbir sınırı kaydırmadı — bu yüzden şu an yukarıdaki Bölge Renk Haritası ile birebir aynı.'
       )
     );
   };
@@ -24888,7 +25297,7 @@ function BolgeTab({athlete,workouts,onUpdateAthlete}){
         );
       })(),
       athlete.boundaryLastCalib&&React.createElement('div',{style:{marginTop:8}},
-        React.createElement('button',{className:'btn btn-sm',onClick:resetBoundaries},'↺ Jenerik şablona sıfırla')
+        React.createElement('button',{className:'btn btn-sm',onClick:resetBoundaries},'↺ Standart şablona sıfırla')
       ),
       !bcRawCount&&!bcScanLoading&&React.createElement('div',{style:{fontSize:12,color:'var(--text-tertiary)',fontStyle:'italic'}},
         'Tarama başlatılmadı.'
@@ -26258,7 +26667,8 @@ const TEST_TURLERI={
       const paceSecKm=sec/5;
       const vlt=5000/sec;
       const pb=secToPace(paceSecKm);
-      return{vlt:Math.round(vlt*1000)/1000,pb_5k:pb,label:'5K Pace: '+pb+' /km · vLT: '+(Math.round(vlt*100)/100)+' m/s'};
+      // pace_sec: aynı tür testler arası kıyaslama (gelişim/gerileme) için sayısal referans.
+      return{vlt:Math.round(vlt*1000)/1000,pb_5k:pb,pace_sec:Math.round(paceSecKm),label:'5K Pace: '+pb+' /km · vLT: '+(Math.round(vlt*100)/100)+' m/s'};
     },
     guncelle:['vlt_kalibre','pb_5k'],
     freq_hafta:4,
@@ -26280,10 +26690,31 @@ const TEST_TURLERI={
     girdi:[{k:'maf_nabiz',l:'MAF Nabzı (bpm)',type:'number',min:110,max:175,ph:'145'},{k:'km1_pace',l:'1. km Pace (dk:sn)',type:'text',ph:'6:30'},{k:'km3_pace',l:'3. km Pace (dk:sn)',type:'text',ph:'6:45'},{k:'km5_pace',l:'5. km Pace (dk:sn)',type:'text',ph:'7:00'}],
     hesapla:(r)=>{
       const p1=paceToSec(r.km1_pace);
-      const p5=paceToSec(r.km5_pace)||paceToSec(r.km3_pace);
+      const p3=paceToSec(r.km3_pace);
+      const p5r=paceToSec(r.km5_pace);
+      const p5=p5r||p3;
       if(!p1)return null;
       const fark=p5?Math.round(p5-p1):null;
-      return{maf_nabiz:parseInt(r.maf_nabiz)||0,maf_pace:r.km1_pace,label:'1. km: '+r.km1_pace+(p5?' → 5. km: '+r.km5_pace+(fark?' ('+( fark>0?'+':'')+fark+'sn/km)':''):'')};
+      // Test Geçmişi'nde aynı tür testler arası kıyaslama (15.09.2026, Göksel talebi:
+      // "gelişim ya da gerileme tespit edilsin — ortalama pace + 1./5. km") için
+      // km1/km3/km5 saniye değerleri ve ortalama pace AYRICA sayısal alan olarak
+      // saklanır (eskiden sadece label metnine gömülüydü, güvenilir kıyaslama
+      // yapılamıyordu). maf_pace/label geriye uyumluluk için değişmeden kalır.
+      const splits=[p1,p3||null,p5r||null].filter(Boolean);
+      const ortPaceSec=splits.length?Math.round(splits.reduce((a,b)=>a+b,0)/splits.length):null;
+      return{
+        maf_nabiz:parseInt(r.maf_nabiz)||0,maf_pace:r.km1_pace,
+        km1_pace:r.km1_pace||null,km1_sec:p1||null,
+        km3_pace:r.km3_pace||null,km3_sec:p3||null,
+        km5_pace:r.km5_pace||null,km5_sec:p5r||null,
+        ort_pace_sec:ortPaceSec,ort_pace:ortPaceSec?secToPace(ortPaceSec):null,
+        // fark: TEK testin İÇİNDEKİ 1.→son km pace değişimi (testler-arası kıyaslamadan
+        // farklı) — 15.09.2026, Göksel kararı: yön-duyarlı yorumlama için ayrıca saklanır
+        // (negatif=hızlanma normal/beklenen — kardiyak gecikme; pozitif=yavaşlama uyarı
+        // işareti — kardiyak sürüklenme/aerobik yetersizlik).
+        fark:fark,
+        label:'1. km: '+r.km1_pace+(p5?' → 5. km: '+r.km5_pace+(fark?' ('+( fark>0?'+':'')+fark+'sn/km)':''):'')
+      };
     },
     guncelle:['aerobik_baseline'],
     freq_hafta:4,
@@ -26316,9 +26747,129 @@ const TEST_TURLERI={
   }
 };
 
+// ── Test kıyaslama ciddiyeti — GLOBAL/PAYLAŞILAN (15.09.2026, Göksel talebi).
+// Önceleri TestTab içinde yerelken buraya taşındı: hem rozet listesi (testKarsilastir)
+// hem de yeni ChartTestKiyas (aşağıda) AYNI eşik/seviye/hız hesabını kullanmalı —
+// "grafikte görünen ile rozette yazan farklı sayı" riski oluşturmamak için tek
+// kaynak. Eşikler/çarpanlar Göksel'in coaching deneyimine göre ayarlanabilir
+// TAHMİNLERDİR, klinik/kesin değer değildir.
+const SEVERITY_ESIK={pace:[8,20,40],vo2max:[1,2.5,5],lthr:[2,5,10]};
+const SEVIYE_GELISIM_CARPANI={baslangic:2.0,rekrasyon:1.00,orta:0.75,ileri:0.5,elit:0.3};
+const GELISIM_ADI=[['🙂','Gelişim var'],['💪','Güzel gelişim'],['🎉','Harika gelişim']];
+const GERILEME_ADI=[['🙁','Hafif gerileme'],['⚠️','Belirgin gerileme'],['🚨','Ciddi gerileme']];
+const gunFarki=(d1,d2)=>Math.round((new Date(d1+'T12:00:00')-new Date(d2+'T12:00:00'))/864e5);
+const severityTier=(rate28,esikler)=>{ // rate28<0 → gelişim yönü, >0 → gerileme yönü
+  const a=Math.abs(rate28);
+  if(a<esikler[0])return null; // stabil
+  const idx=a<esikler[1]?0:(a<esikler[2]?1:2);
+  return rate28<0?GELISIM_ADI[idx]:GERILEME_ADI[idx];
+};
+// Test türü → grafikte çizilecek metrik(ler). testKarsilastir'daki alan adlarıyla
+// AYNI (_testSonuc.km1_sec vb.) — iki farklı gösterim (rozet/grafik) aynı veriden.
+const TEST_METRIK_KONFIG={
+  maf:{lines:[
+    {field:'km1_sec',ad:'1. km',renk:'#f59e0b',ana:false},
+    {field:'km5_sec',ad:'5. km',renk:'#3b82f6',ana:false},
+    {field:'ort_pace_sec',ad:'Ortalama',renk:'#22c55e',ana:true}
+  ],birim:'sn/km',esikKey:'pace',higherIsBetter:false},
+  zaman_5k:{lines:[{field:'pace_sec',ad:'Ortalama Pace',renk:'#22c55e',ana:true}],birim:'sn/km',esikKey:'pace',higherIsBetter:false},
+  cooper:{lines:[{field:'vo2max',ad:'VO₂max',renk:'#22c55e',ana:true}],birim:' ml/kg/dk',esikKey:'vo2max',higherIsBetter:true},
+  lthr_test:{lines:[{field:'lthr',ad:'LTHR',renk:'#22c55e',ana:true}],birim:' bpm',esikKey:'lthr',higherIsBetter:true}
+};
+// Test Geçmişi'nde bir test türünün 2+ kaydını süreç grafiği olarak çizer. Ana
+// metriğin nokta renkleri, testKarsilastir/deltaBadge'deki AYNI hesapla (süreye
+// normalize hız + seviye çarpanlı eşik) yeşil (gelişim)/turuncu (gerileme)/gri
+// (stabil) işaretlenir — "tespit edilen gelişim/gerileme" rozetlerle bire bir
+// tutarlı, ayrı bir hesap icat edilmez. Pace metriklerinde (düşük=iyi) Y ekseni
+// TERS çevrilir ki grafikte "yukarı" her metrikte "gelişim" anlamına gelsin.
+function ChartTestKiyas({tid,records,athlete}){
+  const ref=useRef();const inst=useRef();
+  const cfg=TEST_METRIK_KONFIG[tid];
+  useEffect(()=>{
+    if(!ref.current||!cfg)return;
+    const data=[...records].sort((a,b)=>a.date.localeCompare(b.date)); // kronolojik
+    const labels=data.map(d=>fmtShort(d.date));
+    const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+    const gridColor=isDark?'rgba(255,255,255,.08)':'rgba(0,0,0,.08)';
+    const tickColor=isDark?'#777':'#888';
+    const noktaGri=isDark?'#666':'#aaa';
+    if(inst.current)inst.current.destroy();
+    const carpan=SEVIYE_GELISIM_CARPANI[athlete?.seviye]??1.00;
+    const esikler=(SEVERITY_ESIK[cfg.esikKey]||[8,20,40]).map(x=>x*carpan);
+    const anaLn=cfg.lines.find(l=>l.ana)||cfg.lines[0];
+    const anaPointColors=data.map((d,i)=>{
+      if(i===0)return noktaGri;
+      const cur=d._testSonuc?.[anaLn.field],prev=data[i-1]._testSonuc?.[anaLn.field];
+      if(cur==null||prev==null)return noktaGri;
+      const raw=cur-prev;
+      const skor=cfg.higherIsBetter?-raw:raw;
+      const gunF=Math.max(gunFarki(d.date,data[i-1].date),14);
+      const rate28=skor/gunF*28;
+      if(Math.abs(rate28)<esikler[0])return noktaGri;
+      return skor<0?'#22c55e':'#f59e0b';
+    });
+    const fmtVal=v=>v==null?'—':(cfg.birim==='sn/km'?secToPace(v)+' /km':(Math.round(v*10)/10)+cfg.birim);
+    const datasets=cfg.lines.map(ln=>({
+      label:ln.ad,
+      data:data.map(d=>d._testSonuc?.[ln.field]??null),
+      borderColor:ln.renk,backgroundColor:ln.renk,
+      borderWidth:ln.ana?3:1.5,
+      pointRadius:ln.ana?5:2,
+      pointBackgroundColor:ln.ana?anaPointColors:ln.renk,
+      pointBorderColor:ln.ana?anaPointColors:ln.renk,
+      spanGaps:true,tension:.25
+    }));
+    inst.current=new Chart(ref.current,{
+      type:'line',
+      data:{labels,datasets},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{display:cfg.lines.length>1,position:'bottom',labels:{color:tickColor,font:{size:10},boxWidth:10,padding:8}},
+          tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtVal(ctx.raw)}}
+        },
+        scales:{
+          x:{ticks:{color:tickColor,font:{size:10}},grid:{color:gridColor},border:{display:false}},
+          y:{
+            reverse:!cfg.higherIsBetter,
+            ticks:{color:tickColor,font:{size:10},callback:v=>cfg.birim==='sn/km'?secToPace(v):v},
+            grid:{color:gridColor},border:{display:false}
+          }
+        }
+      }
+    });
+    return()=>{if(inst.current)inst.current.destroy();};
+  },[records,tid,athlete?.seviye]);
+  if(!cfg||!records||records.length<2)return null;
+  return React.createElement('div',{style:{position:'relative',height:170,marginTop:10,marginBottom:4}},React.createElement('canvas',{ref}));
+}
+
 // Test zamanlama: Bu sporcu için şu an test önerilmeli mi?
 // Belirli bir tarih için test uygunluğunu değerlendir
-function calcTestDayUygunluk(testDate, athlete, history, races, workouts, dunkuYogunPlanlanan=false){
+// ── Test Günü Sert Engelleri — TEK PAYLAŞILAN KAYNAK (14.09.2026, Göksel onayı) ──
+// HRV/sakatlık eşiği, kaliteli-gün engellemesinde kullanılan AYNI eşik (bkz.
+// ~satır 6500 kaliteliEngelSebep, ~satır 6525 blokNeden) — yeni bir sayı icat
+// edilmedi. Bunlara ek olarak: bazı testler (Cooper/5K Zaman Denemesi/LTHR —
+// gerçek maksimal efor) öncesinde günün GERÇEKTEN dinlenme olmasını şart koyar;
+// MAF testi submaksimal/aerobik olduğundan bu şarttan muaftır (sadece "önceki
+// gün yoğun olmasın" yeterli — bkz. dunkuYogun kontrolü).
+// Hem otomatik rozet (attachTestSuggestions → calcTestDayUygunluk) HEM DE Test
+// sekmesindeki manuel gün seçici (TestTab → takvimGunleri) BU FONKSİYONU çağırır
+// — iki yer birbirinden bağımsız sonuç üretmesin diye (panel paritesi).
+const TEST_TAM_DINLENME_GEREKTIREN=['cooper','zaman_5k','lthr_test'];
+function testGunSertEngeller(testId, athlete, oncekiGunDinlenmeydi){
+  const engeller=[];
+  if(!athlete)return engeller;
+  const sakInt=parseInt(athlete.sakatlık)||1;
+  if(athlete.hrv_durum==='düşük')engeller.push('HRV düşük');
+  else if(athlete.hrv_durum==='dengesiz')engeller.push('HRV dengesiz');
+  if(sakInt>=4)engeller.push('sakatlık '+sakInt+'/10');
+  if(testId&&TEST_TAM_DINLENME_GEREKTIREN.includes(testId)&&oncekiGunDinlenmeydi===false){
+    engeller.push((TEST_TURLERI[testId]?.ad||testId)+' öncesi tam dinlenme günü gerekir');
+  }
+  return engeller;
+}
+function calcTestDayUygunluk(testDate, athlete, history, races, workouts, dunkuYogunPlanlanan=false, testId=null, oncekiGunDinlenmePlanli=null){
   if(!testDate||!athlete)return null;
   const testD=new Date(testDate+'T12:00:00');
   const {primary}=selectRaces(athlete,races);
@@ -26331,6 +26882,11 @@ function calcTestDayUygunluk(testDate, athlete, history, races, workouts, dunkuY
   const oncekiAntrenman=athWks.find(w=>w.date===oncekiGunStr);
   const dunkuYogunKayitli=oncekiAntrenman&&['interval','esik','yokus_kisa','yokus_uzun','tirmanis'].includes(oncekiAntrenman.tur);
   const dunkuYogun=dunkuYogunKayitli||dunkuYogunPlanlanan;
+  // Önceki gün GERÇEKTEN dinlenme miydi? Kayıtlı bir antrenman varsa (türü ne
+  // olursa olsun) kesinlikle dinlenme değildi. Yoksa çağıranın (gelecek gün için
+  // üretilmiş plandan) verdiği bayrağa güvenilir; o da yoksa (geçmiş gün, veri
+  // yok) kanıt olmadığından dinlenme kabul edilir.
+  const oncekiGunDinlenmeydi=oncekiAntrenman?false:(oncekiGunDinlenmePlanli!=null?oncekiGunDinlenmePlanli:true);
 
   // O güne yakın geçmişteki TSB tahmini
   const last=history[history.length-1];
@@ -26345,7 +26901,7 @@ function calcTestDayUygunluk(testDate, athlete, history, races, workouts, dunkuY
   if(daysToRace<14)sorunlar.push('Yarışa '+daysToRace+' gün kaldı — test yorgunluğu yarışı etkileyebilir');
   if(acwr>1.3)sorunlar.push('ACWR '+acwr.toFixed(2)+' — yük birikimi yüksek');
   if(tsb<_tsbBTest.riskAlt)sorunlar.push('TSB '+tsb.toFixed(1)+' — yorgunluk fazla, test sonuçları güvenilmez');
-  if(athlete.hrv_durum==='düşük')sorunlar.push('HRV düşük — toparlanma yetersiz');
+  sorunlar.push(...testGunSertEngeller(testId,athlete,oncekiGunDinlenmeydi));
 
   // Önerilen alternatif günler (önümüzdeki 14 gün, uygunluk sırasıyla)
   const oneriler=[];
@@ -26478,8 +27034,12 @@ function attachTestSuggestions(weeks,athlete,history,races,actualWorkouts){
       if(!testId)return;
       const oncekiGun=allDays[idx-1];
       const dunkuYogunPlanlanan=!!(oncekiGun&&TEST_ONCEKI_GUN_YOGUN_TIPLERI.includes(oncekiGun.tip));
-      const gunUygunluk=calcTestDayUygunluk(day.date,athlete,history,races,actualWorkouts,dunkuYogunPlanlanan);
-      if(gunUygunluk&&gunUygunluk.uygun===false)return; // bu gün için özel bir engel var (yarış yakın, ACWR/TSB vb.)
+      // Gelecek gün için planlanmış önceki günün GERÇEKTEN dinlenme olup olmadığı
+      // (14.09.2026, Göksel onayı) — Cooper/5K/LTHR gibi maksimal-efor testleri
+      // öncesi tam dinlenme şartı için (bkz. testGunSertEngeller/TEST_TAM_DINLENME_GEREKTIREN).
+      const oncekiGunDinlenmePlanli=oncekiGun?(oncekiGun.tip==='dinlenme'):null;
+      const gunUygunluk=calcTestDayUygunluk(day.date,athlete,history,races,actualWorkouts,dunkuYogunPlanlanan,testId,oncekiGunDinlenmePlanli);
+      if(gunUygunluk&&gunUygunluk.uygun===false)return; // bu gün için özel bir engel var (yarış yakın, ACWR/TSB, HRV/sakatlık, dinlenme şartı vb.)
       const testDef=TEST_TURLERI[testId];
       if(!testDef)return;
       day.testSuggestion={testId,ad:testDef.ad,icon:testDef.icon,neden:onerilir[testId].neden||null};
@@ -26667,6 +27227,19 @@ function TestTab({athlete,history,races,workouts,onUpdateAthlete,onSaveWorkout,o
           const prevWk=(workouts||[]).find(w=>w.athleteId===athlete.id&&w.date===prevStr&&['interval','esik','yokus_kisa','yokus_uzun'].includes(w.tur));
           if(prevWk){uygunluk=uygunluk==='ideal'?'uygun':'orta';neden.push('Dün ağır antrenman vardı');}
         }
+        // SERT ENGELLER — TEK PAYLAŞILAN KAYNAK (14.09.2026, Göksel onayı): HRV/
+        // sakatlık ve (Cooper/5K/LTHR için) önceki günün gerçek dinlenme olması
+        // şartı. Otomatik rozetin kullandığı AYNI fonksiyon (testGunSertEngeller) —
+        // iki yer (bu manuel seçici + attachTestSuggestions'daki otomatik rozet)
+        // asla farklı sonuç vermesin diye. TSB/ACWR kademesi ne derse desin, sert
+        // bir engel varsa gün doğrudan "uygunsuz" olur.
+        const _prevDateSert=new Date(d);_prevDateSert.setDate(d.getDate()-1);
+        const _prevDsSert=`${_prevDateSert.getFullYear()}-${String(_prevDateSert.getMonth()+1).padStart(2,'0')}-${String(_prevDateSert.getDate()).padStart(2,'0')}`;
+        const _prevActualWkSert=(workouts||[]).find(w=>w.athleteId===athlete.id&&w.date===_prevDsSert);
+        const _prevDayShortSert=DAYS_SHORT[_prevDateSert.getDay()];
+        const _oncekiGunDinlenmeydiSert=_prevActualWkSert?false:!(kosuGunleri.includes(_prevDayShortSert)||caprazGunleri.includes(_prevDayShortSert));
+        const _sertEngeller=testGunSertEngeller(planlaTest.id,athlete,_oncekiGunDinlenmeydiSert);
+        if(_sertEngeller.length){uygunluk='uygunsuz';neden.push(..._sertEngeller);}
       }
       const renkMap={ideal:'var(--success)',uygun:'var(--info)',orta:'var(--warn)',uygunsuz:'var(--border)'};
       const bgMap={ideal:'var(--success-bg)',uygun:'var(--info-bg)',orta:'var(--warn-bg)',uygunsuz:'var(--bg-secondary)'};
@@ -26760,16 +27333,14 @@ function TestTab({athlete,history,races,workouts,onUpdateAthlete,onSaveWorkout,o
             React.createElement('ol',{style:{fontSize:12,color:'var(--text-secondary)',paddingLeft:20,margin:'0 0 12px'}},
               (()=>{
                 // MAF testi için nabız adımını sporcu bazlı hesapla
+                // Panel paritesi/aynı kök neden düzeltmesi (bkz. mafNabizDetay, 15.09.2026):
+                // sadece 180−yaş; LTHR bazlı alternatif kaldırıldı (kafa karışıklığı +
+                // ardışık MAF testleri arasında tutarsız kıyaslama riski yaratıyordu).
                 const steps=t.id==='maf'?t.protocol_steps.map((s,i)=>{
                   if(i===0){
                     const yasH=athlete?.dogum?new Date().getFullYear()-new Date(athlete.dogum).getFullYear():null;
                     const mafH=yasH!=null?180-yasH:null;
-                    const lthrV=parseSayi(athlete?.lthr)||0;
-                    const lthrLo=lthrV>0?Math.round(lthrV*0.80):null;
-                    const lthrHi=lthrV>0?Math.round(lthrV*0.85):null;
-                    if(mafH!=null&&lthrLo!=null) return `MAF nabzını belirle: 180 − ${yasH} = ${mafH} bpm · LTHR (${lthrV}) × %80-85 = ${lthrLo}–${lthrHi} bpm`;
                     if(mafH!=null) return `MAF nabzını belirle: 180 − ${yasH} = ${mafH} bpm`;
-                    if(lthrLo!=null) return `MAF nabzını belirle (LTHR bazlı): ${lthrLo}–${lthrHi} bpm`;
                   }
                   return s;
                 }):t.protocol_steps;
@@ -26830,6 +27401,11 @@ function TestTab({athlete,history,races,workouts,onUpdateAthlete,onSaveWorkout,o
             if(tid==='maf'){
               if(w._testSonuc.maf_pace)preForm.km1_pace=w._testSonuc.maf_pace;
               if(w._testSonuc.maf_nabiz)preForm.maf_nabiz=String(w._testSonuc.maf_nabiz);
+              // DÜZELTME (15.09.2026): km3/km5 de _testSonuc'ta ayrıca saklanıyor
+              // artık (bkz. hesapla) — düzenlerken bunlar da geri doldurulmalı,
+              // aksi halde koç her düzenlemede km3/km5'i sıfırdan girmek zorunda kalırdı.
+              if(w._testSonuc.km3_pace)preForm.km3_pace=w._testSonuc.km3_pace;
+              if(w._testSonuc.km5_pace)preForm.km5_pace=w._testSonuc.km5_pace;
             }
           }
           setEditRecord(w);
@@ -26849,6 +27425,103 @@ function TestTab({athlete,history,races,workouts,onUpdateAthlete,onSaveWorkout,o
           if(matchingPlan)onDeleteTestPlan(matchingPlan.id);
           setEditRecord(null);setEditForm({});
         };
+        // ── Aynı tür testler arası kıyaslama — SÜREYE NORMALİZE, DERECELİ, SEVİYEYE
+        // ÖLÇEKLİ (15.09.2026, Göksel talebi). Eşik/çarpan/hesap mantığı artık GLOBAL
+        // (bkz. ~satır 26544 SEVERITY_ESIK/SEVIYE_GELISIM_CARPANI/severityTier) —
+        // ChartTestKiyas (aşağıda çağrılıyor) İLE AYNI kaynağı paylaşır, tekrar
+        // tanımlanmaz. "28 günlük eşdeğer değişim hızı" (skor/gün×28) — böylece
+        // 5 ayda -57sn/km ile 3 haftada -57sn/km AYNI ciddiyette sayılmaz. 14
+        // günden yakın testlerde gün sayısı 14'e sabitlenir (floor).
+        const _gelisimCarpan=SEVIYE_GELISIM_CARPANI[athlete?.seviye]??1.00;
+        const deltaBadge=(curVal,prevVal,lbl,unit,metricKey,curDate,prevDate,higherIsBetter)=>{
+          if(curVal==null||prevVal==null)return null;
+          const raw=curVal-prevVal;
+          const d=Math.round(raw);
+          const skor=higherIsBetter?-raw:raw; // negatif=gelişim yönü (normalize)
+          const gunF=Math.max(gunFarki(curDate,prevDate),14);
+          const rate28=skor/gunF*28;
+          const esiklerBase=SEVERITY_ESIK[metricKey]||[8,20,40];
+          const esikler=esiklerBase.map(x=>x*_gelisimCarpan);
+          const tier=severityTier(rate28,esikler);
+          const rawText=d===0?'değişim yok':((d>0?'+':'')+d+unit);
+          const kuyruk=tier?(' · '+tier[0]+' '+tier[1]):(d===0?'':' · Stabil');
+          const renk=!tier?{bg:'var(--bg-tertiary)',fg:'var(--text-tertiary)'}:(skor<0?{bg:'var(--success-bg)',fg:'var(--success)'}:{bg:'var(--warn-bg)',fg:'var(--warn)'});
+          return React.createElement('span',{key:lbl,style:{
+            fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:10,whiteSpace:'nowrap',
+            background:renk.bg,color:renk.fg
+          }},lbl+': '+rawText+kuyruk);
+        };
+        const testKarsilastir=(tid,cur,prev)=>{
+          if(!prev)return null;
+          const cs=cur._testSonuc||{},ps=prev._testSonuc||{};
+          let parts=[];
+          if(tid==='maf'){
+            parts=[
+              deltaBadge(cs.km1_sec,ps.km1_sec,'1. km','sn/km','pace',cur.date,prev.date,false),
+              deltaBadge(cs.km5_sec,ps.km5_sec,'5. km','sn/km','pace',cur.date,prev.date,false),
+              deltaBadge(cs.ort_pace_sec,ps.ort_pace_sec,'Ortalama','sn/km','pace',cur.date,prev.date,false),
+              // EK (15.09.2026, Göksel'in netleştirmesi): yukarıdaki 3 rozet "1. km" ve
+              // "5. km"'nin MUTLAK pace'ini iki test arasında kıyaslıyor — ama testin
+              // KENDİ İÇİNDEKİ 1.→5. km farkının (bkz. mafIcTestYorum, cs.fark/ps.fark)
+              // kendisi henüz kıyaslanmıyordu. Bu, "yavaşlama eğilimi zamanla düzeliyor
+              // mu" sorusuna cevap verir — mutlak pace'ten BAĞIMSIZ bir sinyal.
+              // ÖNEMLİ: ham fark değil, sadece POZİTİF (yavaşlama) kısmı kıyaslanır —
+              // mafIcTestYorum'daki AYNI ilke (negatif fark/hızlanma her zaman "iyi"
+              // sayılır, cezalandırılmaz). Ham fark kıyası yanıltıcı olurdu: örn. -17
+              // ile -40 arası "gerileme" çıkardı, oysa ikisi de tutarlı/hızlanan tempo
+              // bölgesinde — hiçbir gerçek sorun yok.
+              deltaBadge(
+                cs.fark!=null?Math.max(cs.fark,0):null,
+                ps.fark!=null?Math.max(ps.fark,0):null,
+                'Yavaşlama eğilimi','sn/km','pace',cur.date,prev.date,false
+              ),
+              // EK (15.09.2026, Göksel: "hiçbir sorun olmasa da bir yorum yapılmalı"):
+              // iki fark da negatifse (ikisi de "sorun yok" bölgesinde) yukarıdaki
+              // rozet hep "değişim yok" gösterir — ama ham |fark| değişmiş olabilir ve
+              // bu, ısınma/pacing paterninde gerçek bir bilgi taşır: |fark| KÜÇÜLMESİ,
+              // tempo'nun daha ERKEN istikrar bulduğunu (1. km artık gerçek performansa
+              // daha yakın) gösterir; |fark| BÜYÜMESİ ise ilk kilometrenin öncekine göre
+              // daha temkinli/yavaş başladığını gösterir. Risk değil — nötr (gri) bilgi
+              // notu. 8sn/km altı değişim gürültü kabul edilip gösterilmez.
+              (()=>{
+                if(cs.fark==null||ps.fark==null||cs.fark>0||ps.fark>0)return null;
+                const absD=Math.abs(cs.fark)-Math.abs(ps.fark);
+                if(Math.abs(absD)<8)return null;
+                return React.createElement('span',{key:'farkBilgi',style:{
+                  fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:10,whiteSpace:'nowrap',
+                  background:'var(--bg-tertiary)',color:'var(--text-tertiary)'
+                }},absD<0?'ℹ️ Tempo daha erken istikrar buldu':'ℹ️ İlk km öncekine göre daha temkinli başladı');
+              })()
+            ].filter(Boolean);
+          } else if(tid==='zaman_5k'){
+            parts=[deltaBadge(cs.pace_sec,ps.pace_sec,'Ortalama pace','sn/km','pace',cur.date,prev.date,false)].filter(Boolean);
+          } else if(tid==='cooper'){
+            parts=[deltaBadge(cs.vo2max,ps.vo2max,'VO₂max',' ml/kg/dk','vo2max',cur.date,prev.date,true)].filter(Boolean);
+          } else if(tid==='lthr_test'){
+            parts=[deltaBadge(cs.lthr,ps.lthr,'LTHR',' bpm','lthr',cur.date,prev.date,true)].filter(Boolean);
+          }
+          return parts.length?parts:null;
+        };
+        // ── MAF: TEK testin İÇİNDEKİ 1.→5. km pace değişimi yorumu (15.09.2026,
+        // Göksel kararı — yöne duyarlı): testler-arası kıyaslamadan (yukarıdaki
+        // testKarsilastir) BAĞIMSIZ, tek bir test kaydının kendi tutarlılığını
+        // değerlendirir. Negatif fark (hızlanma) kardiyak gecikme etkisiyle normal/
+        // beklenen kabul edilir — uyarı tetiklemez. Pozitif fark (yavaşlama) aynı
+        // nabız tavanında çıktının sürdürülemediğini (kardiyak sürüklenme/aerobik
+        // yetersizlik) gösterir — eşiğe göre kademeli uyarı verir.
+        const mafIcTestYorum=(w)=>{
+          const fark=w?._testSonuc?.fark;
+          if(fark==null)return null;
+          let text,variant;
+          if(fark<=10){text='✓ Tutarlı/gelişen tempo';variant='success';}
+          else if(fark<=25){text='⚠ Hafif yavaşlama';variant='warn';}
+          else{text='⚠ Belirgin yavaşlama — aerobik taban çalışması öncelikli';variant='warn';}
+          return React.createElement('span',{style:{
+            fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:10,whiteSpace:'nowrap',
+            background:variant==='success'?'var(--success-bg)':'var(--warn-bg)',
+            color:variant==='success'?'var(--success)':'var(--warn)'
+          }},text);
+        };
         return React.createElement('div',null,
           siraliGruplar.map(([tid,wkList])=>{
             const testDef=TEST_TURLERI[tid];
@@ -26858,14 +27531,21 @@ function TestTab({athlete,history,races,workouts,onUpdateAthlete,onSaveWorkout,o
                 React.createElement('div',{style:{fontWeight:700,fontSize:14}},testDef?.ad||tid),
                 React.createElement('span',{className:'badge badge-info',style:{fontSize:11}},wkList.length+' kayıt')
               ),
-              wkList.map(w=>{
+              // 15.09.2026, Göksel talebi: "tespit edilen gelişim/gerileme grafikle
+              // takip edilsin". 2'den az kayıtta trend anlamsız — gösterilmez (bkz.
+              // ChartTestKiyas'ın kendi records.length<2 koruması).
+              React.createElement(ChartTestKiyas,{tid,records:wkList,athlete}),
+              wkList.map((w,wIdx)=>{
                 const isEditing=editRecord?.id===w.id;
                 const label=w._testSonuc?.label||(w.notlar?.replace('Test sonucu: ','')||'—');
+                const cmp=testKarsilastir(tid,w,wkList[wIdx+1]);
+                const icYorum=tid==='maf'?mafIcTestYorum(w):null;
                 return React.createElement('div',{key:w.id,style:{borderTop:'1px solid var(--border)',paddingTop:8,marginTop:8}},
                   !isEditing&&React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}},
                     React.createElement('div',{style:{flex:1}},
                       React.createElement('div',{style:{fontSize:13,fontWeight:600}},fmtDate(w.date)),
-                      React.createElement('div',{style:{fontSize:12,color:'var(--text-secondary)',marginTop:2}},label)
+                      React.createElement('div',{style:{fontSize:12,color:'var(--text-secondary)',marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}},label,icYorum),
+                      cmp&&React.createElement('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginTop:5}},cmp)
                     ),
                     React.createElement('div',{style:{display:'flex',gap:6}},
                       React.createElement('button',{className:'btn btn-sm',onClick:()=>handleEditOpen(w)},'✏️ Düzenle'),
@@ -29253,6 +29933,33 @@ function gpxTimeAtDist(points,dTarget){
   const frac=(dTarget-a.d)/(b.d-a.d||1);
   return a.t+frac*(b.t-a.t);
 }
+// ── Gerçek tepe tespiti (cardiac lag) — kısa (≤SHORT_ROW_MAX_SEC) tekrarlı iş
+// bacaklarında (ör. Yokuş Sprint) GERÇEK tepe nabız, bacak bittikten hemen SONRA
+// (Dinlenme'nin ilk saniyelerinde) oluşabilir — nabız bu kadar kısa bir maksimal
+// çıkışa fizyolojik olarak "yetişemez", tepkisi gecikmeli gelir. İş bacağının kendi
+// penceresi (t0-t1) bu geciken zirveyi göremez; Dinlenme bacağı ise KASITLI olarak
+// min alır (toparlanmanın derinliğini göstermek için — bkz. gpxBuildLegPayload
+// isRecovery), o yüzden zirveyi görse de atar. Sonuç: gerçek tepe iki pencerenin
+// arasında kaybolur (Göksel bildirimi, GPX grafiğinde ~170bpm zirveler görülürken
+// reçetede tepe nabız çok düşük çıkıyor, 2026.09.14).
+// DÜZELTME DENEMESİ 1 (Göksel'in 2. bildirimi, aynı gün): sabit bir gecikme SÜRESİ
+// tahmin etmek yerine nabız eğrisinde "yükseliş sonrası kararlı düşüş" (trend-reversal)
+// aranan bir sürüm denendi — DROP_BPM kadar düşüp CONFIRM_SEC boyunca sürdüren bir
+// düşüş "tepe onaylandı" sayılıp arama durduruluyordu.
+// DÜZELTME DENEMESİ 2 — KALDIRILDI (Göksel'in 3. bildirimi, aynı gün, Yokuş Sprint 2
+// örneği): gerçek, gürültülü nabız verisinde (özellikle şiddetli yokuş sprintinde bilek
+// tipi optik sensör) KISA SÜRELİ bir gürültü düşüşü bile DROP_BPM+CONFIRM_SEC eşiğini
+// aşıp "tepe onaylandı" sanılabiliyordu — arama, izin verilen pencere İÇİNDE, gerçek
+// (daha sonraki, daha yüksek) tepeye ulaşmadan duruyordu. Kanıt: aynı pencerede Dinlenme
+// bacağının KENDİ ham max'ı (hiçbir yorum içermeyen düz pencere) zaten doğru zirveyi
+// gösteriyordu — yani sorun pencerenin darlığı değil, eğriyi "yorumlama" girişimiydi.
+// SON ÇÖZÜM: yorum YOK — searchCeilT'ye kadar pencerede BASİT ham maksimum. Grafik de
+// zaten hiçbir yorum yapmadan ham veriyi çiziyor ve zirve orada görünüyor; algoritmanın
+// da aynısını (arada "trend" tahmini yapmadan) yapması hem daha basit hem daha güvenilir.
+function gpxFindTruePeak(points,t0,searchCeilT){
+  const vals=points.filter(p=>p.t>=t0&&p.t<=searchCeilT&&p.hr!=null).map(p=>p.hr);
+  return vals.length?Math.max(...vals):null;
+}
 function gpxHrStatsWindow(points,t0,t1){
   const vals=points.filter(p=>p.t>=t0&&p.t<t1&&p.hr!=null).map(p=>p.hr);
   if(vals.length===0) return {avg:null,max:null,min:null};
@@ -29346,15 +30053,38 @@ function gpxAutoFillPatch(rawParsed,norm){
 // toplam mesafe/süre kullanılır. Pencere içinde yeterli mesafe/süre yoksa (durma,
 // çok kısa pencere) null döner — grafikte bu nokta çizilmez (çizgi kırılır), sıfıra
 // bölme kaynaklı sahte pikler üretilmez.
+// DÜZELTME 1 (Göksel bildirimi — grafikte pace zirvelerinin tekrar/Yokuş Sprint
+// sütunlarından kaymış görünmesi, 2026.09.14): pencere ÖNCEDEN sadece GERİYE bakıyordu
+// (t noktasının pace'i, [t-windowSec, t] aralığından hesaplanıp t'ye çiziliyordu) —
+// bu, gerçek bir hızlanmayı SİSTEMATİK olarak ileri kaydırıyordu (kısa efor bitince
+// bile pencere hâlâ o hızlı veriyi içerdiğinden, etki eforun dışına taşıyordu). Artık
+// pencere t'nin İKİ YANINA (t-windowSec/2, t+windowSec/2) simetrik açılıyor — kayma
+// kalkar, kalan tek etki pencere boyunca kaçınılmaz bir yumuşama/bulanıklık, artık
+// YÖNSÜZ. Dosya başı/sonunda pencere mevcut veriyle sınırlı kalır (asimetrik açılır).
+// DÜZELTME 2 — pencere boyutu 20sn→10sn (Göksel: "en ideal pencere neyse o olsun,
+// sen karar ver", 2026.09.14): ölçüm gösterdi ki 20sn'lik (yarı-yarıçap 10sn)
+// ortalanmış pencerede bile sprint sonrası ~6-10sn'lik bir kalıntı kayma kalıyordu
+// (gerçek en hızlı an tırmanışın son anına çok yakın olduğundan, pencerenin yarısı
+// hâlâ takip eden yürüyüşten veri katıyordu). 10sn'e (yarı-yarıçap 5sn) düşürmek bu
+// kalıntıyı da kabaca yarıya indirir. Bu değer keyfi değil: Göksel'in en kısa
+// eforları (Yokuş Sprint gibi) ≥25-30sn (bkz. SHORT_ROW_MAX_SEC=45) — 10sn'lik bir
+// pencere, en kısa eforun ORTASINDA bile ~15-20sn'lik "temiz" (pencerenin dışına
+// taşmayan) bir düzlük bırakır, aynı zamanda GPS nokta-nokta gürültüsünü yumuşatacak
+// kadar da geniştir (aşırı sıçramalı bir çizgi üretmez). Daha da küçültmek (ör. 5-6sn)
+// hizalamayı biraz daha sıkılaştırır ama GPS gürültüsüne orantısız açık bırakır —
+// burada denge noktası budur.
 function gpxInstantPaceSeries(points,windowSec){
-  windowSec=windowSec||20;
+  windowSec=windowSec||10;
+  const half=windowSec/2;
   const out=[];
-  let j=0;
+  let lo=0,hi=0;
   for(let i=0;i<points.length;i++){
-    while(j<i&&(points[i].t-points[j].t)>windowSec) j++;
-    const dt=points[i].t-points[j].t;
-    const dd=(points[i].d||0)-(points[j].d||0);
-    out.push({t:points[i].t,paceSec:(dt>=Math.min(windowSec,5)&&dd>3)?(dt/(dd/1000)):null});
+    const tC=points[i].t;
+    while(lo<i&&tC-points[lo].t>half) lo++;
+    while(hi<points.length-1&&points[hi+1].t-tC<=half) hi++;
+    const dt=points[hi].t-points[lo].t;
+    const dd=(points[hi].d||0)-(points[lo].d||0);
+    out.push({t:tC,paceSec:(dt>=Math.min(windowSec,5)&&dd>3)?(dt/(dd/1000)):null});
   }
   return out;
 }
@@ -29371,7 +30101,7 @@ function drawGpxChart(canvas,points,phases){
   // mevcut) kayan pencereyle YENİDEN hesaplar — bkz. gpxInstantPaceSeries üstündeki not.
   const paceSeries=points.some(p=>p.pace!=null)
     ?points.map(p=>({t:p.t,paceSec:p.pace}))
-    :gpxInstantPaceSeries(points,20);
+    :gpxInstantPaceSeries(points,10);
   const pacePts=paceSeries.filter(p=>p.paceSec!=null);
   if(hrPts.length===0&&pacePts.length===0) return;
   const tMax=points[points.length-1].t||1;
@@ -29467,7 +30197,7 @@ function gpxDownsamplePoints(points,maxPoints){
 // tasarrufu, bkz. üstteki not) — smoothed pace TAM ÇÖZÜNÜRLÜKTE bir kere hesaplanıp
 // (gpxInstantPaceSeries) noktalara gömülüyor, downsample bu hazır değeri hr gibi taşır.
 function gpxBuildChartData(points,phaseRows,fileName){
-  const paceSeries=gpxInstantPaceSeries(points,20);
+  const paceSeries=gpxInstantPaceSeries(points,10);
   const pointsWithPace=points.map((p,i)=>({...p,pace:paceSeries[i]?paceSeries[i].paceSec:null}));
   return{
     points:gpxDownsamplePoints(pointsWithPace,250),
@@ -29737,11 +30467,25 @@ function gpxComputePhases(points,blockCfgs){
   });
   native.forEach(p=>{p.t1=Math.min(p.t1,totalEndT);p.t0=Math.min(p.t0,p.t1);});
 
-  const rows=native.map(p=>{
+  const rows=native.map((p,idx)=>{
     const durSec=p.t1-p.t0;
     const distKm=(gpxDistAtTime(points,p.t1)-gpxDistAtTime(points,p.t0))/1000;
     const pace=durSec>0&&distKm>0?(durSec/distKm):null;
     const hr=gpxHrStatsWindow(points,p.t0,p.t1);
+    // Gerçek tepe tespiti (bkz. gpxFindTruePeak yorumu) — kısa iş bacaklarında SADECE
+    // max, güvenlik tavanına kadar genişletilen pencerede ham maksimum olarak yeniden
+    // aranır; avg/min yukarıdaki orijinal hr'de değişmeden kalır. searchCeilT: bir sonraki Dinlenme'nin
+    // bitişi (varsa) ile p.t1+30sn güvenlik tavanından hangisi daha erkense.
+    if(p.legKind==='work'&&durSec>0&&durSec<=SHORT_ROW_MAX_SEC){
+      const next=native[idx+1];
+      const nextIsRest=next&&next.legKind==='rest'&&next.blockIdx===p.blockIdx&&next.repIndex===p.repIndex;
+      const hardCeiling=Math.min(p.t1+30,totalEndT);
+      const searchCeilT=nextIsRest?Math.min(next.t1,hardCeiling):hardCeiling;
+      if(searchCeilT>p.t0){
+        const truePeak=gpxFindTruePeak(points,p.t0,searchCeilT);
+        if(truePeak!=null&&(hr.max==null||truePeak>hr.max)) hr.max=truePeak;
+      }
+    }
     const hrEdge=gpxHrEdgeStats(points,p.t0,p.t1);
     return {...p,distKm,durSec,pace,hr,hrEdge};
   });
@@ -29856,7 +30600,19 @@ function gpxBuildLegPayload(baseRow,phase,liveZones,isAralikLeg){
   const isCooldown=/soğuma|soguma/i.test(label);
   const isRecovery=(baseRow.type==='rest'||baseRow.type==='walk')&&!isWarmup&&!isCooldown;
   const rowDur=(baseRow.h||0)*3600+(baseRow.m||0)*60+(baseRow.s||0);
-  const isShort=!baseRow.rpe&&!baseRow._isSprint&&rowDur>0&&rowDur<=SHORT_ROW_MAX_SEC;
+  // KÖK NEDEN DÜZELTMESİ (Göksel bildirimi, GPX Analiz'de RPE'ye dayalı/"Hissiyat
+  // Odaklı" kısa satırların — ör. Yokuş Sprint, RPE 9-10 — tepe nabız yerine
+  // ortalama nabız alması, 2026.09.14): isShort ÖNCEDEN `!baseRow.rpe&&
+  // !baseRow._isSprint&&...` idi — yani RPE/_isSprint satırları BİLEREK max'tan
+  // hariç tutulup ort.'a düşürülüyordu. Ama kodun HİÇBİR başka yerinde (bpmValidation
+  // ~satır 10167, bpmValidationAralik ~satır 11141, aralık tablosu ipucu ~satır
+  // 10332) bu istisna yok — üçü de SADECE süreye bakıyor. Sonuç: aralık ipucu
+  // doğru şekilde "▲tepe" gösterirken (basit kuralı kullandığı için), gpxBuildLegPayload
+  // farklı bir kuralla ortalamayı yazıyordu — rozet "tepe" diyor, veri "ortalama"
+  // oluyordu. Semantik olarak da yanlıştı: 30sn'lik maksimal bir sprintin ortalaması,
+  // tırmanışın ısınan kısmını da işe katıp gerçek zirveyi maskeliyor. Çözüm: istisna
+  // kaldırıldı, kodun geri kalanıyla AYNI (sadece süre) kurala eşitlendi.
+  const isShort=rowDur>0&&rowDur<=SHORT_ROW_MAX_SEC;
   const hr=phase.hr||{};
   if(isCooldown){
     if(hr.avg!=null) out.bpmAvg=Math.round(hr.avg);
@@ -33010,7 +33766,7 @@ function App(){
       tab==='anketler'&&React.createElement(AnketlerTab,{athletes,onUpdateAthlete:handleUpdateAthlete}),
       tab==='dashboard'&&React.createElement(Dashboard,{workouts:athWks,athlete,history,races,teamLogo,teamName,planSnap}),
       tab==='motivasyon'&&React.createElement(ErrorBoundary,null,React.createElement(MotivasyonTab,{athlete,workouts:athWks,history})),
-      tab==='plan'&&React.createElement(ErrorBoundary,null,React.createElement(HaftalikPlanTab,{athlete,history,races,workouts,testPlanlar,planSnapInit:planSnap,onPlanSnapChange:setPlanSnapApp,onAthletesRefresh:freshList=>setAthletes(freshList),onWorkoutsRefresh:freshWks=>setWorkouts(freshWks),onUpdateAthlete:handleUpdateAthlete,onUpdateWorkout:handleUpdateWorkout,onSaveWorkout:w=>{const ath=athletes.find(a=>a.id===w.athleteId);const m=calcMetrics(w,ath);const rec=calcRecovery(w,ath,m.yukObj);const mergedHedef=mergeRecoveryHedef(rec.hedefISO,rec.saatler,workouts,w.athleteId);setWorkouts(p=>[...p,{...w,recovery_saatler:rec.saatler,recovery_kategori:rec.kategori,recovery_hedef:mergedHedef}]);},onSaveTestPlan:p=>setTestPlanlar(prev=>[...prev.filter(x=>!(x.athId===p.athId&&x.testTur===p.testTur)),p])})),
+      tab==='plan'&&React.createElement(ErrorBoundary,null,React.createElement(HaftalikPlanTab,{athlete,history,races,workouts,testPlanlar,planSnapInit:planSnap,onPlanSnapChange:setPlanSnapApp,onAthletesRefresh:freshList=>setAthletes(freshList),onWorkoutsRefresh:freshWks=>setWorkouts(freshWks),onUpdateAthlete:handleUpdateAthlete,onUpdateWorkout:handleUpdateWorkout,onSaveWorkout:w=>{const ath=athletes.find(a=>a.id===w.athleteId);const m=calcMetrics(w,ath);const rec=calcRecovery(w,ath,m.yukObj);const mergedHedef=mergeRecoveryHedef(rec.hedefISO,rec.saatler,workouts,w.athleteId);setWorkouts(p=>[...p,{...w,recovery_saatler:rec.saatler,recovery_kategori:rec.kategori,recovery_hedef:mergedHedef}]);},onSaveTestPlan:p=>setTestPlanlar(prev=>[...prev.filter(x=>!(x.athId===p.athId&&x.testTur===p.testTur)),p]),onDeleteTestPlan:id=>setTestPlanlar(p=>p.filter(x=>x.id!==id))})),
       tab==='lider'&&React.createElement(LiderlikTab,{athletes,workouts,teamName,teamLogo,races,leaderboardWeights,setLeaderboardWeights,leaderboardVisible,setLeaderboardVisible}),
       tab==='bolge'&&React.createElement(BolgeTab,{athlete,workouts:athWks,onUpdateAthlete:handleUpdateAthlete}),
       tab==="test"&&React.createElement(TestTab,{athlete,history,races,workouts,onUpdateAthlete:handleUpdateAthlete,onSaveWorkout:w=>setWorkouts(p=>[...p,w]),onUpdateWorkout:handleUpdateWorkout,onDeleteWorkout:id=>setWorkouts(p=>p.filter(x=>x.id!==id)),testPlanlar,onSaveTestPlan:p=>setTestPlanlar(prev=>[...prev.filter(x=>!(x.athId===p.athId&&x.testTur===p.testTur)),p]),onDeleteTestPlan:id=>setTestPlanlar(p=>p.filter(x=>x.id!==id))}),
@@ -33477,6 +34233,12 @@ function SporcuAnketi(){
       setDataLoadedAt(new Date());
       setSaved(true);
       setTimeout(function(){setSaved(false);},3000);
+
+      // Anket kaydı başarılı — Göksel'e bilgilendirme e-postası gönderilir
+      // (Göksel talebi, 2026.09.15). Kayıt/UI akışını engellememesi için
+      // await edilmez; hata olursa yalnızca console'a uyarı düşer.
+      const sporcuAdiEmail=((mevcut.ad||'')+' '+(mevcut.soyad||'')).trim()||'Sporcu';
+      sendAnketBildirimEmail(sporcuAdiEmail,anketOzetiOlustur(formLive,mhrPatch,lthrPatch));
     }catch(e){alert('Kayıt hatası: '+e.message);}
     setSaving(false);
   };
@@ -33503,6 +34265,7 @@ function SporcuAnketi(){
       // Race condition önlemi: kaydetmeden önce Firebase'den güncel veriyi çek
       const freshAths=await fbGet('ath2');
       const freshAll=freshAths||athletes;
+      const mevcutGiris=freshAll.find(function(a){return a.id===selId;})||athletes.find(function(a){return a.id===selId;})||{};
       const nowIso=new Date().toISOString();
       const updated=freshAll.map(function(a){
         if(a.id!==selId)return a;
@@ -33516,6 +34279,12 @@ function SporcuAnketi(){
       setDataLoadedAt(new Date());
       setGirisSaved(true);
       setTimeout(function(){setShowGiris(false);},1200);
+
+      // Giriş anketi kaydı başarılı — Göksel'e bilgilendirme e-postası
+      // (Göksel talebi, 2026.09.15 — "tüm anketler için bildirim"). Kayıt/UI
+      // akışını engellememesi için await edilmez.
+      const sporcuAdiGirisEmail=((mevcutGiris.ad||'')+' '+(mevcutGiris.soyad||'')).trim()||'Sporcu';
+      sendAnketBildirimEmail(sporcuAdiGirisEmail,girisAnketiOzetiOlustur(girisForm));
     }catch(e){alert('Kayıt hatası: '+e.message);}
     setGirisSaving(false);
   };
@@ -34558,7 +35327,10 @@ function SporcuPlanView(){
     // Yarış günü ise eski mantık (tek koşu reçetesi) — koşu/çapraz ayrımı uygulanmaz
     // FIX: Koşu tipi listesi — ov.tip bu listede değilse VE isKosuCapraz değilse koşu bölümü yok
     const _KOSU_TIPLERI=['kolay','serbest','aerobik','uzun','tempo','tempo_sureli','esik','esik_sureli','interval','piramit','kesintisiz_piramit','yokus_kisa','yokus_uzun','tirmanis','teknik','acici','progressive','cruise','yaris_tempo','on_off','hill_sprint','strides','back_to_back','yuru_kos'];
-    const _ovTipKosu = ov ? (_KOSU_TIPLERI.includes(ov.tip) || ov.isKosuCapraz===true) : false;
+    // 2026.09.16 — panel paritesi: yerel _KOSU_TIPLERI listesinde yürüyüş plan tipleri
+    // (power_hiking/tempolu_yurume/rahat_yurume) yoktu → bu günler Koşu İzlerim'de "saf çapraz"
+    // sayılıp boş bir "💪 Çapraz ❌ Yapılmadı" bölümü açılıyordu. Koç paneliyle AYNI küme kullanılır.
+    const _ovTipKosu = ov ? (_KOSU_TIP_SET.has(ov.tip) || ov.isKosuCapraz===true) : false;
     // KÖK NEDEN DÜZELTMESİ (18.07.2026) — bkz. koç panelindeki aynı not (showKosu, ~satır 17178):
     // ov MEVCUTSA (planlı bir hafta için her zaman mevcuttur) gösterim SADECE plan tipine
     // bakıyordu — plan dışı gerçekleşen koşu (split.kosuActuals) tamamen görmezden geliniyordu.
@@ -34576,7 +35348,7 @@ function SporcuPlanView(){
       let displayYapilar=ov?.yapilar||[];
       const _band=ctlBand(0);
       const _isKosuCapraz = ov?.isKosuCapraz===true;
-      const _kosuActual = (info.actuals||[]).find(w=>(w.spor||'kosu')==='kosu');
+      const _kosuActual = (info.actuals||[]).find(w=>isKosuSlotWorkout(w,ov));
 
       // Koç paneli yaklaşımı: plan yapilar varsa doğrudan kullan (injectRowsFromTpl zaten _rows ekler).
       // Regenerasyon yalnızca plan yapilar tamamen boşsa devreye girer.
@@ -34592,8 +35364,8 @@ function SporcuPlanView(){
         // Fallback 1: actual'dan üret (plan yoksa veya boşsa)
         if(_kosuActual){
           try{
-            const _tur=_kosuActual.tur||_kosuActual.spor||'aerobik';
-            const _effTur=_KOSU_TIPLERI.includes(_tur)?_tur:'aerobik';
+            const _tur=kosuSlotTur(_kosuActual,ov?.tip);
+            const _effTur=_KOSU_TIP_SET.has(_tur)?_tur:'aerobik';
             const _yapiNotu=_kosuActual.yapi_notu||'';
             const _sureDk=Math.round((toSec(_kosuActual.sure_sa,_kosuActual.sure_dk,_kosuActual.sure_sn)||0)/60)||ov?.sure_dk||45;
             const _tpl=tplFromYapiNotu(_effTur,_yapiNotu,_band,_sureDk,zones,athlete.disiplin||'karma','Temel',0,undefined,athlete);
@@ -34646,8 +35418,8 @@ function SporcuPlanView(){
       }
 
       // Görüntülenen tip: actual varsa actual'dan, yoksa ov'dan; koşu tipi değilse 'aerobik'
-      const _rawDisplayTip=_kosuActual?(_kosuActual.tur||_kosuActual.spor||'aerobik'):(ov?.tip||'aerobik');
-      let _displayTip=_KOSU_TIPLERI.includes(_rawDisplayTip)?_rawDisplayTip:'aerobik';
+      const _rawDisplayTip=kosuSlotTur(_kosuActual,ov?.tip);
+      let _displayTip=_KOSU_TIP_SET.has(_rawDisplayTip)?_rawDisplayTip:'aerobik';
       // Koç paneliyle parite: Yürü-Koş tespit edildiyse tip de tutarlı olsun (bkz. satır ~15702)
       if(_ykM) _displayTip='yuru_kos';
       // Eski snapshot uyumu + D+ güncelleme: detay metninden _gapAvgPaceSec hesapla ve _rows.pSec güncelle
@@ -35120,13 +35892,20 @@ function SporcuPlanView(){
           const sporList=Object.entries(row.sporDagilim||{}).map(([k,v])=>(SPOR_MAP[k]?.emoji||'🏅')+' ×'+v).join(' ');
           const up=row.uygunlukPct;
           const upColor=up==null?'#475569':up>=85?'#2dd4bf':up>=70?'#4ade80':up>=50?'#fbbf24':'#f87171';
+          // 2026.09.15 — panel paritesi: Koç Paneli LiderlikTab'daki (~satır 8452)
+          // AYNI değişiklik — sadece EN YAKIN yarış değil, hazırlandığı VE yüklenme
+          // planı fiilen başlamış (calcPhase 'Temel' dışına çıkmış) TÜM yarışlar.
           const athRaceIds=(row.ath.yarıslar||[]).map(x=>typeof x==='string'?x:x.id);
-          const nearest=(races||[])
+          const activePrep=(races||[])
             .filter(r=>athRaceIds.includes(r.id)&&r.tarih&&r.tarih>=todayStrMini)
-            .map(r=>({...r,daysLeft:Math.ceil((new Date(r.tarih+'T12:00:00')-todayMini)/864e5)}))
-            .sort((a,b)=>a.daysLeft-b.daysLeft)[0];
-          const urgent=nearest&&nearest.daysLeft<=14;
-          const soon=nearest&&nearest.daysLeft<=30;
+            .map(r=>{
+              const daysLeft=Math.ceil((new Date(r.tarih+'T12:00:00')-todayMini)/864e5);
+              const phase=r.prep_weeks?calcPhase(todayStrMini,r.tarih,r.prep_weeks,r,getAthRaceOverride(row.ath,r.id)):null;
+              const hazirlikBasladi=!!phase&&phase!=='Temel'&&phase!=='Yarış Sonrası';
+              return{...r,daysLeft,hazirlikBasladi};
+            })
+            .filter(r=>r.hazirlikBasladi)
+            .sort((a,b)=>a.daysLeft-b.daysLeft);
           const prevRow=prevStatsMini.find(r=>r.ath.id===row.ath.id);
           const prevSkor=prevRow?.finalScore||0;
           const skorDiff=round1(row.finalScore-prevSkor);
@@ -35168,14 +35947,18 @@ function SporcuPlanView(){
               React.createElement('div',{style:{fontSize:9,color:upColor,fontWeight:600,marginTop:1}},
                 '🎯 Hedef Uyumu: '+(up==null?'—':Math.round(up)+'%')
               ),
-              nearest&&React.createElement('div',{style:{
-                fontSize:9,marginTop:1,
-                color:nearest.ertelendi?'#fbbf24':urgent?'#f87171':soon?'#fbbf24':'#94a3b8',
-                fontWeight:nearest.ertelendi||urgent||soon?600:400,
-                textDecoration:nearest.ertelendi?'line-through':'none'
-              }},
-                '🏁 '+nearest.ad+(nearest.ertelendi?' · Ertelendi':' · '+(nearest.daysLeft===0?'bugün':nearest.daysLeft+' gün'))
-              )
+              activePrep.map(r=>{
+                const urgent=r.daysLeft<=14;
+                const soon=r.daysLeft<=30;
+                return React.createElement('div',{key:r.id,style:{
+                  fontSize:9,marginTop:1,
+                  color:r.ertelendi?'#fbbf24':urgent?'#f87171':soon?'#fbbf24':'#94a3b8',
+                  fontWeight:r.ertelendi||urgent||soon?600:400,
+                  textDecoration:r.ertelendi?'line-through':'none'
+                }},
+                  '🏁 '+r.ad+(r.ertelendi?' · Ertelendi':' · '+(r.daysLeft===0?'bugün':r.daysLeft+' gün'))
+                );
+              })
             ),
             // Metrikler
             React.createElement('div',{style:{textAlign:'right',flexShrink:0,maxWidth:'50%'}},
