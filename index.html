@@ -426,7 +426,6 @@
         <div><label>Bitiş saati</label><input type="time" id="tk_svcend"></div>
       </div>
     </div>
-    <div class="fld" id="tk_notifyWrap" style="display:none"><label>Bildirim tarihi (opsiyonel — iş size ne zaman bildirildi)</label><input type="date" id="tk_notify"></div>
     <div class="fld"><label>Süre — ne kadar sürer?</label>
       <select id="tk_duration">
         <option value="dakika">Dakikalar (birkaç dakikada biter)</option>
@@ -1622,7 +1621,6 @@ function openTaskModal(devId){
   document.getElementById('tk_svcdate').value='';
   document.getElementById('tk_svcstart').value='';
   document.getElementById('tk_svcend').value='';
-  document.getElementById('tk_notify').value='';
   toggleRepeatFields(); toggleDeviceField();
 }
 function editTask(id){
@@ -1644,14 +1642,12 @@ function editTask(id){
   document.getElementById('tk_svcdate').value=t.svcDate||'';
   document.getElementById('tk_svcstart').value=t.svcStart||'';
   document.getElementById('tk_svcend').value=t.svcEnd||'';
-  document.getElementById('tk_notify').value=t.notifyDate||'';
   toggleRepeatFields(); toggleDeviceField();
 }
 function toggleDeviceField(){
   const show = document.getElementById('tk_type').value!=='kisisel';
   document.getElementById('tk_deviceWrap').style.display = show?'block':'none';
   document.getElementById('tk_svcWrap').style.display = show?'block':'none';
-  document.getElementById('tk_notifyWrap').style.display = show?'block':'none';
 }
 function toggleRepeatFields(){
   const v=document.getElementById('tk_repeat').value;
@@ -1676,8 +1672,7 @@ function saveTask(){
     repeat, weekdays, monthdays, afterdays:document.getElementById('tk_afterdays').value,
     svcDate: type==='kisisel' ? null : (document.getElementById('tk_svcdate').value||null),
     svcStart: type==='kisisel' ? '' : (document.getElementById('tk_svcstart').value||''),
-    svcEnd: type==='kisisel' ? '' : (document.getElementById('tk_svcend').value||''),
-    notifyDate: type==='kisisel' ? null : (document.getElementById('tk_notify').value||null) };
+    svcEnd: type==='kisisel' ? '' : (document.getElementById('tk_svcend').value||'') };
 
   if(id){
     const t=db.tasks.find(x=>x.id===id);
@@ -1688,7 +1683,6 @@ function saveTask(){
     const changes=[];
     if(t.title!==fields.title) changes.push(`başlık "${fields.title}" olarak güncellendi`);
     if((t.due||'')!==(fields.due||'')) changes.push(`son tarih ${fields.due?fields.due+' olarak güncellendi':'kaldırıldı'}`);
-    if((t.notifyDate||'')!==(fields.notifyDate||'')) changes.push(`bildirim tarihi ${fields.notifyDate?fields.notifyDate+' olarak güncellendi':'kaldırıldı'}`);
     if(t.prio!==fields.prio) changes.push(`öncelik ${pName[fields.prio]} olarak güncellendi`);
     if((t.duration||'oturum')!==fields.duration) changes.push(`süre ${DUR_LABEL[fields.duration]} olarak güncellendi`);
     if((t.device||'')!==(fields.device||'')) changes.push(`bağlı cihaz ${devName(fields.device)} olarak güncellendi`);
@@ -2132,7 +2126,7 @@ function renderTasks(){
           <div class="t-name ${t.done?'done':''}">${esc(t.title)}</div>
           ${dev?`<div class="t-link" onclick="goToDeviceCard('${dev.id}')" title="Cihaz kartına git">↳ ${esc(dev.name)}${[dev.brand,dev.model].filter(Boolean).join(' ')?' · '+esc([dev.brand,dev.model].filter(Boolean).join(' ')):''}${devPlace(dev)?' · '+esc(devPlace(dev)):''}${devNumsArr(dev).length?' · '+devNumsArr(dev).join('  '):''}</div>`:''}
           ${t.svcDate?`<div style="margin-top:4px"><span class="tag-mini" style="background:var(--surface2);color:${t.svcDone?'var(--dim)':'var(--blue)'};cursor:pointer${t.svcDone?';text-decoration:line-through':''}" onclick="quickServis('${t.id}')">🔧 ${t.svcDone?'Servis tamamlandı':'Servis planlandı'}: ${esc(t.svcDate)}${t.svcStart?' '+esc(t.svcStart):''}${t.svcEnd?'–'+esc(t.svcEnd):''}</span></div>`:''}
-          <div class="t-meta"><span class="when-edit" onclick="editTaskCreated('${t.id}')" title="Açılış tarihini/saatini düzenle">Açılış ${esc(t.created)}${t.createdTime?' '+esc(t.createdTime):''}</span>${t.notifyDate?' · bildirim '+esc(t.notifyDate):''}${t.done?` · <span class="when-edit" onclick="editTaskClosed('${t.id}')" title="Bitiş tarihini/saatini düzenle">Bitiş ${esc(t.closed)}${t.closedTime?' '+esc(t.closedTime):''}</span>`:' · '+age+' gündür açık'}${t.due?(dueWarn?' · ⚠ son tarih '+esc(t.due):' · son tarih '+esc(t.due)):''}${t.repeat&&t.repeat!=='tek'?' · '+rpName[t.repeat]:''}${subs.length?' · alt görev '+subDone+'/'+subs.length:''} · ${DUR_LABEL[t.duration||'oturum']}</div>
+          <div class="t-meta"><span class="when-edit" onclick="editTaskCreated('${t.id}')" title="Açılış tarihini/saatini düzenle">Açılış ${esc(t.created)}${t.createdTime?' '+esc(t.createdTime):''}</span>${t.done?` · <span class="when-edit" onclick="editTaskClosed('${t.id}')" title="Bitiş tarihini/saatini düzenle">Bitiş ${esc(t.closed)}${t.closedTime?' '+esc(t.closedTime):''}</span>`:' · '+age+' gündür açık'}${t.due?(dueWarn?' · ⚠ son tarih '+esc(t.due):' · son tarih '+esc(t.due)):''}${t.repeat&&t.repeat!=='tek'?' · '+rpName[t.repeat]:''}${subs.length?' · alt görev '+subDone+'/'+subs.length:''} · ${DUR_LABEL[t.duration||'oturum']}</div>
           ${t.note?`<div style="font-size:12.5px;color:var(--muted);margin-top:5px">${esc(t.note)}</div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span class="prio p-${t.prio}">${pName[t.prio]}</span></div>
