@@ -1012,10 +1012,12 @@ function openTamamNotModal(kind, id){
   document.getElementById('tn_kind').value=kind;
   document.getElementById('tn_id').value=id;
   document.getElementById('tn_note').value='';
-  document.getElementById('tamamNotTitle').textContent = kind==='bakim' ? 'Bakım tamamlandı' : 'Servis tamamlandı';
+  document.getElementById('tamamNotTitle').textContent = kind==='bakim' ? 'Bakım tamamlandı' : (kind==='servis' ? 'Servis tamamlandı' : 'İş tamamlandı');
   document.getElementById('tamamNotLabel').textContent = kind==='bakim'
     ? 'Bakımda ne yapıldı? (cihazın tarihçesine eklenecek — opsiyonel)'
-    : 'Serviste ne yapıldı? (işin günlüğüne eklenecek — opsiyonel)';
+    : (kind==='servis'
+      ? 'Serviste ne yapıldı? (işin günlüğüne eklenecek — opsiyonel)'
+      : 'İşte ne yapıldı? (işin günlüğüne eklenecek — opsiyonel)');
   document.getElementById('tamamNotModal').classList.add('open');
   setTimeout(()=>document.getElementById('tn_note')?.focus(), 60);
 }
@@ -1036,7 +1038,7 @@ function saveTamamNot(){
     }
     saveDb(); closeModal('tamamNotModal'); renderBakim();
     toast('Bakım tamamlandı');
-  } else {
+  } else if(kind==='servis'){
     const t=db.tasks.find(x=>x.id===id); if(!t){ closeModal('tamamNotModal'); return; }
     t.svcDone=true;
     if(!t.log) t.log=[];
@@ -1051,6 +1053,37 @@ function saveTamamNot(){
     syncServisDeviceFault(t);
     saveDb(); closeModal('tamamNotModal'); renderBakim(); if(tab==='task') renderTasks();
     toast('Servis tamamlandı');
+  } else if(kind==='is'){
+    const t=db.tasks.find(x=>x.id===id); if(!t){ closeModal('tamamNotModal'); return; }
+    if(!t.log) t.log=[];
+    if(note){
+      const noteEntry={ id:uid(), when:now(), what:note };
+      t.log.unshift(noteEntry);
+      syncLogEntryToDevice(t, noteEntry);
+    }
+    const doneEntry={ id:uid(), when:now(), what:'İş tamamlandı.', auto:true };
+    t.log.unshift(doneEntry);
+    syncLogEntryToDevice(t, doneEntry);
+    if(t.repeat && t.repeat!=='tek'){
+      // tekrarlayan iş: bu turu kapat, yeni turu aç
+      const nd=nextDate(t);
+      t.done=true; t.closed=today(); t.closedTime=nowTime();
+      if(nd){
+        const fresh={ ...t, id:uid(), done:false, closed:null, closedTime:null, created:nd, createdTime:null, due:nd, log:[],
+          svcDate:null, svcStart:'', svcEnd:'', svcCreated:null, svcDone:false,
+          subtasks:(t.subtasks||[]).map(s=>({ ...s, id:uid(), done:false, closed:null })) };
+        db.tasks.unshift(fresh);
+        toast('Tekrar bir sonraki tarihe taşındı: '+nd);
+      } else {
+        toast('Tekrar için gün seçilmemiş — tek sefer kapatıldı');
+      }
+    } else {
+      t.done=true; t.closed=today(); t.closedTime=nowTime();
+      toast('İş tamamlandı');
+    }
+    syncServisDeviceFault(t);
+    saveDb(); closeModal('tamamNotModal'); renderTasks();
+    if(tab==='bakim') renderBakim();
   }
 }
 function delBakim(id){
@@ -1733,22 +1766,9 @@ function nextDate(t){
 }
 function toggleTask(id){
   const t=db.tasks.find(x=>x.id===id);
-  if(!t.done && t.repeat && t.repeat!=='tek'){
-    // tekrarlayan iş: bu turu kapat, yeni turu aç
-    const nd=nextDate(t);
-    t.done=true; t.closed=today(); t.closedTime=nowTime();
-    if(nd){
-      const fresh={ ...t, id:uid(), done:false, closed:null, closedTime:null, created:nd, createdTime:null, due:nd, log:[],
-        svcDate:null, svcStart:'', svcEnd:'', svcCreated:null, svcDone:false,
-        subtasks:(t.subtasks||[]).map(s=>({ ...s, id:uid(), done:false, closed:null })) };
-      db.tasks.unshift(fresh);
-      toast('Tekrar bir sonraki tarihe taşındı: '+nd);
-    } else {
-      toast('Tekrar için gün seçilmemiş — tek sefer kapatıldı');
-    }
-  } else {
-    t.done=!t.done; t.closed=t.done?today():null; t.closedTime=t.done?nowTime():null;
-  }
+  if(!t.done){ openTamamNotModal('is', id); return; } // tamamlanırken not sorulur
+  // yeniden açma: not sormadan direkt aç
+  t.done=false; t.closed=null; t.closedTime=null;
   syncServisDeviceFault(t);
   saveDb(); renderTasks();
   if(tab==='bakim') renderBakim();
