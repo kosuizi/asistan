@@ -1742,6 +1742,11 @@ function saveTask(){
   } else {
     const t={ id:uid(), ...fields, done:false, svcDone:false, created:today(), createdTime:nowTime(), closed:null, closedTime:null, subtasks:[], log:[] };
     if(t.svcDate) t.svcCreated=now();
+    if(t.device){ // cihaza bağlı iş: açılış kaydı işin günlüğüne + cihazın geçmişine düşer
+      const openEntry={ id:uid(), when:now(), what:'İş açıldı.', auto:true, opened:true };
+      t.log.unshift(openEntry);
+      syncLogEntryToDevice(t, openEntry);
+    }
     db.tasks.unshift(t);
     syncServisDeviceFault(t);
     saveDb(); closeModal('taskModal'); renderTasks(); toast('İş eklendi');
@@ -1817,6 +1822,15 @@ function backfillTaskLogsToDevices(){
       d.faults=d.faults.filter(f=> !(f.fromTask===t.id && d.id!==curDeviceId));
       if(d.faults.length!==before){ moved+=(before-d.faults.length); touched.add(d.id); }
     });
+  });
+  // 1b) Cihaza bağlı olup açılış kaydı olmayan eski işlere, açılış tarihiyle "İş açıldı." kaydı ekle
+  //     (gelecek tarihli tekrar kopyaları hariç). En eski kayıt olarak günlüğün sonuna eklenir.
+  db.tasks.forEach(t=>{
+    if(!t.device || !t.created || t.created>today()) return;
+    if(!db.devices.some(d=>d.id===t.device)) return;
+    if(!t.log) t.log=[];
+    if(t.log.some(l=>l.opened || l.what==='İş açıldı.')) return;
+    t.log.push({ id:uid(), when:t.created+(t.createdTime?' '+t.createdTime:''), what:'İş açıldı.', auto:true, opened:true });
   });
   // 2) Güncel cihazda eksik olan kayıtları ekle.
   db.tasks.forEach(t=>{
