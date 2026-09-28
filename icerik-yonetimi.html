@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-<title>KoşuİZİ — Takım</title>
+<title>İçerik Yönetimi — KoşuİZİ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -738,13 +738,11 @@ async function attemptLogin(){
   location.reload();
 }
 function exitEditMode(){
-  const url=new URL(location.href);
-  url.searchParams.delete('edit');
-  location.href=url.toString();
+  location.href='index.html';
 }
 function logoutAdmin(){
   try{ localStorage.removeItem('kosuizi_admin'); }catch(e){}
-  exitEditMode();
+  location.href='index.html';
 }
 async function togglePublish(){
   const settings=await fbGet('landing_content/settings')||{};
@@ -1376,43 +1374,25 @@ async function init(){
   db=firebase.database();
   try{ await firebase.auth().signInWithEmailAndPassword(FB_EMAIL,FB_PASSWORD); }catch(e){}
 
-  const params=new URLSearchParams(location.search);
-  const editRequested=params.get('edit')==='1';
-
-  // İçerik Yönetimi paneline bu tarayıcıdan giriş yapılmışsa (localStorage'da
-  // işaret varsa), taslak modunda bile "Yakında" yerine sitenin gerçek/son
-  // halini göster.
+  // İçerik Yönetimi sayfası: genel siteyle birebir aynı görünür, tek farkı
+  // her zaman düzenleme modunda olması — ?edit=1 parametresine gerek yok,
+  // "Yakında" ekranı burada hiç gösterilmez (2026.09.23 — Göksel talebi).
   let isAdmin=false;
   try{ isAdmin = localStorage.getItem('kosuizi_admin')==='1'; }catch(e){}
 
-  if(editRequested && !isAdmin){
+  if(!isAdmin){
     document.getElementById('login-gate').style.display='flex';
     document.getElementById('lg-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
     return;
   }
 
-  // Check published + takım logosu (Yakında ekranında da kullanılacak)
-  const [settings,cfg]=await Promise.all([
-    fbGet('landing_content/settings').then(v=>v||{}),
-    fbGet('app_config').then(v=>v||{})
-  ]);
-  if(!settings.published && !isAdmin){
-    document.getElementById('soon-screen').style.display='flex';
-    if(cfg.teamLogo){
-      const simg=document.getElementById('soon-logo-img');
-      const stxt=document.getElementById('soon-logo-text');
-      simg.src=cfg.teamLogo; simg.style.display='block'; stxt.style.display='none';
-    }
-    return;
-  }
+  const settings=await fbGet('landing_content/settings')||{};
   document.getElementById('main-site').style.display='block';
 
-  isEditMode = isAdmin && editRequested;
-  if(isEditMode){
-    document.body.classList.add('edit-mode');
-    document.getElementById('edit-toolbar').style.display='flex';
-    updatePublishBtn(!!settings.published);
-  }
+  isEditMode = true;
+  document.body.classList.add('edit-mode');
+  document.getElementById('edit-toolbar').style.display='flex';
+  updatePublishBtn(!!settings.published);
 
   // Hero
   if(settings.hero_alt)     document.getElementById('hero-alt').textContent=settings.hero_alt;
@@ -1436,6 +1416,7 @@ async function init(){
   });
 
   // Team logo & name from app_config
+  const cfg=await fbGet('app_config')||{};
   if(cfg.teamLogo){
     const img=document.getElementById('nav-logo-img');
     const txt=document.getElementById('nav-logo-text');
