@@ -1,4 +1,4 @@
-<!-- Version: v2026.09.28-1257 --><!DOCTYPE html>
+<!-- Version: v2026.09.28-1311 --><!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -8,42 +8,44 @@
 <meta http-equiv="Expires" content="0">
 <title>Antrenman Takip</title>
 <script>
-// ── Otomatik Güncel Sürüm Kontrolü (18.09.2026 — Göksel isteği) ─────────────
-// Sporcuların/koçun tarayıcı önbelleğinden (veya CDN önbelleğinden) ESKİ bir
-// koc-paneli.html görmesini önler. Sayfa açıldığında (VE tarayıcının
-// "geri-ileri önbelleği" bfcache'ten bu sayfayı canlandırdığında, VE sekme
-// arka plandan öne geldiğinde) sunucudaki dosyanın ETag/Last-Modified imzasını
-// hafif bir HEAD isteğiyle (cache:'no-store' — bu istek asla önbellekten
-// yanıtlanmaz) kontrol eder. Önceki ziyarette kaydedilen imzadan FARKLIYSA,
-// bu cihazda gerçekten YENİ bir sürüm var demektir — sayfa, önbelleği atlayan
-// (rastgele ?_v= parametreli) bir adrese yönlendirilerek TAZE olarak yeniden
-// yüklenir. Bu, tüm ağır kütüphaneler (React, Chart.js vb.) indirilmeden ÖNCE,
-// mümkün olan en erken noktada çalışır. sessionStorage koruması aynı sekmede
-// 15 saniye içinde en fazla bir zorunlu yenilemeye izin verir (sonsuz döngü
-// riski olmaz). NOT: bu script'in KENDİSİ de eski bir önbellekten geliyorsa
-// (bu düzeltmeden ÖNCEKİ bir kopya), o eski kopyada bu kontrol hiç yok —
-// o durumda cihazın EN AZ BİR KEZ elle/tam yenilenmesi gerekir; ondan sonra
-// her gelecekteki güncelleme otomatik yakalanır.
+// ── Otomatik Güncel Sürüm Kontrolü (18.09.2026 — Göksel isteği; 28.09.2026'da yeniden yazıldı) ──
+// Sporcuların/koçun tarayıcı önbelleğinden (veya CDN önbelleğinden) ESKİ bir koc-paneli.html
+// görmesini önler. Önceki sürüm sunucudaki dosyanın ETag imzasını localStorage'a "son görülen"
+// diye kaydedip bir sonrakiyle kıyaslıyordu; bu, ilk açılışta ESKİ (önbellekteki) kopya
+// çalışırken sunucudaki YENİ imzayı "görüldü" diye kaydedip bir daha hiç yenilememe açığı
+// taşıyordu (kod doğru ama ekranda eski sayfa). Şimdi kıyas, ÇALIŞAN kopyanın kendi sürümü
+// (RUNNING) ile sunucudaki dosyanın en üstündeki "Version:" HTML yorumu arasında yapılır;
+// saklanan bir durum yoktur, bu yüzden eski kopya her açılışta yakalanır. Sadece dosyanın ilk
+// birkaç KB'ı okunur (tam 2+ MB indirilmez). Farklıysa sayfa önbelleği atlayan (?_v=) bir
+// adresle TAZE yüklenir; sessionStorage koruması 15 sn içinde en fazla bir yenilemeye izin verir.
+// NOT: bu düzeltmeden ÖNCEKİ bir kopya bu kontrolü içermez — o cihazda EN AZ BİR KEZ tam yenileme
+// (Ctrl+Shift+R) gerekir; ondan sonra her güncelleme otomatik yakalanır.
+// RUNNING değeri APP_VERSION ve dosya başındaki Version yorumuyla AYNI olmalıdır.
 (function(){
   try{
-    var SIG_KEY='kosuizi_last_sig';
+    var RUNNING='v2026.09.28-1311';
     var GUARD_KEY='kosuizi_stale_reload_at';
+    var reload=function(){
+      var last=parseInt(sessionStorage.getItem(GUARD_KEY)||'0',10);
+      if(Date.now()-last<=15000)return;
+      sessionStorage.setItem(GUARD_KEY,String(Date.now()));
+      var u=new URL(location.href);
+      u.searchParams.set('_v',Date.now());
+      location.replace(u.toString());
+    };
+    var head=function(r){
+      if(!r||!r.body||!r.body.getReader)return r.text();
+      var rd=r.body.getReader();
+      return rd.read().then(function(x){
+        try{rd.cancel();}catch(e){}
+        return new TextDecoder().decode(x.value||new Uint8Array());
+      });
+    };
     var check=function(){
       try{
-        fetch(location.pathname,{method:'HEAD',cache:'no-store'}).then(function(r){
-          var sig=r.headers.get('etag')||r.headers.get('last-modified')||'';
-          if(!sig)return;
-          var prev=localStorage.getItem(SIG_KEY);
-          localStorage.setItem(SIG_KEY,sig);
-          if(prev&&prev!==sig){
-            var last=parseInt(sessionStorage.getItem(GUARD_KEY)||'0',10);
-            if(Date.now()-last>15000){
-              sessionStorage.setItem(GUARD_KEY,String(Date.now()));
-              var u=new URL(location.href);
-              u.searchParams.set('_v',Date.now());
-              location.replace(u.toString());
-            }
-          }
+        fetch(location.pathname,{cache:'no-store',headers:{'Range':'bytes=0-4095'}}).then(head).then(function(txt){
+          var m=new RegExp('<!'+'--\\s*Version:\\s*(v[0-9.\\-]+)\\s*--'+'>').exec(String(txt).slice(0,2000));
+          if(m&&m[1]!==RUNNING)reload();
         }).catch(function(){});
       }catch(e){}
     };
@@ -309,7 +311,7 @@ const round3=(v)=>Math.round(v*1000)/1000; // mekanik ATL/CTL oranı için — r
 
 // ── Hesap Motoru (TrainingPeaks referanslı) ──────────────────────────────────
 
-const APP_VERSION='v2026.09.28-1257';
+const APP_VERSION='v2026.09.28-1311';
 // 🔧 (2026.08.16 — Göksel talebi, 2026.08.19'da panelden açılıp kapanabilir
 // bir anahtara dönüştürüldü): Koşu İzlerim'deki (SporcuPlanView) "🏆 Bu Hafta
 // Liderlik" mini widget'ının sporculara gösterilip gösterilmeyeceğini belirler.
@@ -37306,7 +37308,8 @@ function SporcuAnketi(){
       sonAnketEl,
       pinEl,
       formEl,
-      planLinkEl
+      planLinkEl,
+      React.createElement('div',{style:{textAlign:'center',fontSize:10,color:'var(--text-tertiary)',marginTop:16}},APP_VERSION)
     ),
     girisModalEl
   );
