@@ -263,7 +263,7 @@
 </div>
 <div class="wrap hidden" id="appRoot">
   <header>
-    <div class="logo"><h1>ASİSTAN</h1><span>yapı 15.09 14:05</span></div>
+    <div class="logo"><h1>ASİSTAN</h1><span>yapı 09.10 10:05</span></div>
     <div class="io">
       <span class="backup-badge ok" id="backupBadge">● Yedeklendi</span>
       <button class="accent" onclick="openIzlem()">İzlem</button>
@@ -693,6 +693,7 @@ async function loadDb(){
   if(!db.settings) db.settings={};
   migrateServisRecords();
   migrateSvcDoneField();
+  migrateClosedTaskServis();
   scrubKisiselServis();
   renderAll();
 }
@@ -703,6 +704,16 @@ function migrateSvcDoneField(){
   let changed=false;
   db.tasks.forEach(t=>{
     if(t.svcDate && t.svcDone===undefined){ t.svcDone=!!t.done; changed=true; }
+  });
+  if(changed) saveDb(true);
+}
+function migrateClosedTaskServis(){
+  // İş tamamlanmışsa servisi de tamamlanmış sayılır. Önceki sürümde işi kapatmak servisi
+  // kapatmıyordu; Faaliyet'te kapanmış işlerin servisi "açık" görünüyordu. Mevcut böyle
+  // kayıtları bir kereye mahsus düzelt (yeni alan eklenmez, sadece svcDone değeri güncellenir).
+  let changed=false;
+  db.tasks.forEach(t=>{
+    if(t.done && t.svcDate && !t.svcDone){ t.svcDone=true; syncServisDeviceFault(t); changed=true; }
   });
   if(changed) saveDb(true);
 }
@@ -1081,6 +1092,8 @@ function saveTamamNot(){
       t.done=true; t.closed=today(); t.closedTime=nowTime();
       toast('İş tamamlandı');
     }
+    // İş kapandığında bağlı servis planı da Faaliyet'te tamamlanmış görünsün
+    if(t.svcDate && !t.svcDone) t.svcDone=true;
     syncServisDeviceFault(t);
     saveDb(); closeModal('tamamNotModal'); renderTasks();
     if(tab==='bakim') renderBakim();
@@ -2686,7 +2699,7 @@ function importBackup(ev){
     if(!Array.isArray(d.maintenance)) d.maintenance=[];
     if(!d.settings || typeof d.settings!=='object') d.settings={};
     db=d;
-    migrateServisRecords(); migrateSvcDoneField(); scrubKisiselServis(); // yedek eski biçimdeyse burada da tamamlansın — sayfa yenilenmesini beklemesin
+    migrateServisRecords(); migrateSvcDoneField(); migrateClosedTaskServis(); scrubKisiselServis(); // yedek eski biçimdeyse burada da tamamlansın — sayfa yenilenmesini beklemesin
     db=d; saveDb(true); markBackedUp(); renderAll(); toast('Yedek yüklendi');
   }catch(e){ toast('Geçersiz yedek dosyası'); } };
   r.readAsText(file); ev.target.value='';
