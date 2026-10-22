@@ -263,7 +263,7 @@
 </div>
 <div class="wrap hidden" id="appRoot">
   <header>
-    <div class="logo"><h1>ASİSTAN</h1><span>yapı 09.10 10:05</span></div>
+    <div class="logo"><h1>ASİSTAN</h1><span>yapı 22.10 09:25</span></div>
     <div class="io">
       <span class="backup-badge ok" id="backupBadge">● Yedeklendi</span>
       <button class="accent" onclick="openIzlem()">İzlem</button>
@@ -499,6 +499,10 @@
     <input type="hidden" id="tn_kind">
     <input type="hidden" id="tn_id">
     <div class="fld"><label id="tamamNotLabel">Ne yapıldı? (opsiyonel)</label><textarea id="tn_note" placeholder="Kısaca not al…"></textarea></div>
+    <div class="fld two">
+      <div><label>Tamamlanma tarihi</label><input type="date" id="tn_date"></div>
+      <div><label>Saat</label><input type="time" id="tn_time"></div>
+    </div>
     <div class="sheet-btns">
       <button class="cancel" onclick="closeModal('tamamNotModal')">Vazgeç</button>
       <button class="save" onclick="saveTamamNot()">Tamamlandı işaretle</button>
@@ -671,6 +675,7 @@ function setMode(m){
 }
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function localDate(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
 function today(){ return new Date().toISOString().slice(0,10); }
 function nowTime(){ return new Date().toTimeString().slice(0,5); }
 function now(){ const d=new Date(); return d.toISOString().slice(0,10)+' '+d.toTimeString().slice(0,5); }
@@ -1023,6 +1028,9 @@ function openTamamNotModal(kind, id){
   document.getElementById('tn_kind').value=kind;
   document.getElementById('tn_id').value=id;
   document.getElementById('tn_note').value='';
+  document.getElementById('tn_date').value=localDate();
+  document.getElementById('tn_date').max=localDate();
+  document.getElementById('tn_time').value=nowTime();
   document.getElementById('tamamNotTitle').textContent = kind==='bakim' ? 'Bakım tamamlandı' : (kind==='servis' ? 'Servis tamamlandı' : 'İş tamamlandı');
   document.getElementById('tamamNotLabel').textContent = kind==='bakim'
     ? 'Bakımda ne yapıldı? (cihazın tarihçesine eklenecek — opsiyonel)'
@@ -1036,15 +1044,19 @@ function saveTamamNot(){
   const kind=document.getElementById('tn_kind').value;
   const id=document.getElementById('tn_id').value;
   const note=document.getElementById('tn_note').value.trim();
+  const cDate=document.getElementById('tn_date').value||localDate();
+  const cTime=document.getElementById('tn_time').value||'';
+  if(cDate>localDate()){ toast('Tamamlanma tarihi gelecekte olamaz'); return; }
+  const cWhen=cDate+(cTime?' '+cTime:'');
   if(kind==='bakim'){
     const item=db.maintenance.find(x=>x.id===id); if(!item){ closeModal('tamamNotModal'); return; }
-    item.done=true; item.closed=today();
+    item.done=true; item.closed=cDate;
     syncFaaliyetDeviceFault(item); // plan durumu satırı ("— Tamamlandı") güncellenir
     if(note){
       const dev=db.devices.find(d=>d.id===item.device);
       if(dev){
         if(!dev.faults) dev.faults=[];
-        dev.faults.unshift({ id:uid(), when:now(), what:note }); // kalıcı, plandan bağımsız tarihçe kaydı
+        dev.faults.unshift({ id:uid(), when:cWhen, what:note }); // kalıcı, plandan bağımsız tarihçe kaydı
       }
     }
     saveDb(); closeModal('tamamNotModal'); renderBakim();
@@ -1054,11 +1066,11 @@ function saveTamamNot(){
     t.svcDone=true;
     if(!t.log) t.log=[];
     if(note){
-      const noteEntry={ id:uid(), when:now(), what:note };
+      const noteEntry={ id:uid(), when:cWhen, what:note };
       t.log.unshift(noteEntry);
       syncLogEntryToDevice(t, noteEntry);
     }
-    const entry={ id:uid(), when:now(), what:'Servis tamamlandı.', auto:true };
+    const entry={ id:uid(), when:cWhen, what:'Servis tamamlandı.', auto:true };
     t.log.unshift(entry);
     syncLogEntryToDevice(t, entry);
     syncServisDeviceFault(t);
@@ -1068,17 +1080,17 @@ function saveTamamNot(){
     const t=db.tasks.find(x=>x.id===id); if(!t){ closeModal('tamamNotModal'); return; }
     if(!t.log) t.log=[];
     if(note){
-      const noteEntry={ id:uid(), when:now(), what:note };
+      const noteEntry={ id:uid(), when:cWhen, what:note };
       t.log.unshift(noteEntry);
       syncLogEntryToDevice(t, noteEntry);
     }
-    const doneEntry={ id:uid(), when:now(), what:'İş tamamlandı.', auto:true };
+    const doneEntry={ id:uid(), when:cWhen, what:'İş tamamlandı.', auto:true };
     t.log.unshift(doneEntry);
     syncLogEntryToDevice(t, doneEntry);
     if(t.repeat && t.repeat!=='tek'){
       // tekrarlayan iş: bu turu kapat, yeni turu aç
       const nd=nextDate(t);
-      t.done=true; t.closed=today(); t.closedTime=nowTime();
+      t.done=true; t.closed=cDate; t.closedTime=cTime;
       if(nd){
         const fresh={ ...t, id:uid(), done:false, closed:null, closedTime:null, created:nd, createdTime:null, due:nd, log:[],
           svcDate:null, svcStart:'', svcEnd:'', svcCreated:null, svcDone:false,
@@ -1089,7 +1101,7 @@ function saveTamamNot(){
         toast('Tekrar için gün seçilmemiş — tek sefer kapatıldı');
       }
     } else {
-      t.done=true; t.closed=today(); t.closedTime=nowTime();
+      t.done=true; t.closed=cDate; t.closedTime=cTime;
       toast('İş tamamlandı');
     }
     // İş kapandığında bağlı servis planı da Faaliyet'te tamamlanmış görünsün
